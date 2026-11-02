@@ -1,0 +1,19 @@
+# Secrets: the API key is never committed (DESIGN.md §5)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Local SQLite databases
+*.db
+*.sqlite3
+
+# Frontend (web/)
+node_modules/

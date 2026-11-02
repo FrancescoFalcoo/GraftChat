@@ -1,0 +1,113 @@
+"""Data model (DESIGN.md §6).
+
+In-memory types mirroring the SQLite tables one-to-one. They carry no
+behaviour: operations and invariants on the conversation tree live in
+``core.tree``, persistence lives outside ``core``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+
+
+class Role(StrEnum):
+    """Role of a message within its thread."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    MERGE = "merge"  # node on main where one or more branches were merged
+
+
+class BranchStatus(StrEnum):
+    """Lifecycle state of a branch."""
+
+    OPEN = "open"
+    MERGED = "merged"
+    DISCARDED = "discarded"
+
+
+class CallPurpose(StrEnum):
+    """Why an LLM call was made (for ``llm_call_log``)."""
+
+    CHAT = "chat"
+    TAKEAWAY = "takeaway"
+    EXPERIMENT = "experiment"
+
+
+class Condition(StrEnum):
+    """Experimental condition (§3). Set only when the purpose is EXPERIMENT."""
+
+    LINEAR = "A"
+    FULL = "B"
+    TAKEAWAY = "C"
+    EXCLUDED = "D"
+
+
+@dataclass
+class Conversation:
+    """A conversation: one main thread plus its branches."""
+
+    id: int
+    title: str
+    created_at: datetime
+
+
+@dataclass
+class Message:
+    """A message on main or inside a branch."""
+
+    id: int
+    conversation_id: int
+    branch_id: int | None  # None = main thread
+    parent_id: int | None  # previous message in the same thread
+    role: Role
+    content: str
+    created_at: datetime
+
+
+@dataclass
+class Branch:
+    """A side conversation anchored to a passage of an assistant message on main."""
+
+    id: int
+    conversation_id: int
+    anchor_message_id: int  # assistant message on main the branch starts from
+    anchor_start: int  # char offsets of the selection in that message
+    anchor_end: int
+    anchor_quote: str  # the selected text, copied (survives re-rendering)
+    status: BranchStatus
+    merge_message_id: int | None  # the 'merge' node on main where it was merged
+    created_at: datetime
+
+
+@dataclass
+class TakeawayPoint:
+    """One point of a branch's take-away, shown as a row of the merge checklist."""
+
+    id: int
+    branch_id: int
+    position: int
+    title: str  # short label shown in the checklist
+    text_generated: str  # what the LLM wrote (never overwritten)
+    text_final: str  # what enters the context (= generated unless edited)
+    included: bool  # checkbox
+
+
+@dataclass
+class LLMCallLog:
+    """Record of a single LLM call, kept for the experiment (§11)."""
+
+    id: int
+    conversation_id: int
+    branch_id: int | None
+    purpose: CallPurpose
+    condition: Condition | None  # experiment only
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost_estimate: float
+    prompt_json: str
+    response_text: str
+    created_at: datetime
