@@ -25,7 +25,47 @@ def thread(messages: Sequence[Message], branch_id: int | None = None) -> list[Me
     Raises:
         InvariantError: if the selected messages do not form a single chain.
     """
-    raise NotImplementedError
+    result = []                                 #lista vuota dove appendiamo i messaggi di quel branch
+    root = []
+
+    #creazione lista dei messaggi
+    for m in messages:                          #scorri tutti i messaggi nel "messages" (nella firma abbiamo ribattezzato la sequenza di messaggi in messages)
+        if m.branch_id==branch_id:              #a differenza di java qui non servono i getter
+            result.append(m)                    #nella nostra lista mettiamo tutti i messaggi di questo branch   
+    if len(result)== 0:
+        return []                               #ritorna la lista vuota se il branch è vuoto 
+
+    #ricerca radice
+    for m in result:
+        if m.parent_id is None:                 #tra questi, cerchiamo il primo nodo del branch
+            root.append(m)
+
+    if len(root)!= 1:
+        raise InvariantError(f"expected 1 root, found {len(root)}")
+
+    #creazione dizionario, non importa l'ordine, l'importante è averli tutti legati padre e figlio
+    path = {}                                   #dizionario dove si ricostruisce la sequenza di messaggi
+    for m in result:
+        if m.parent_id is not None:             
+            if m.parent_id in path:
+                raise InvariantError(f"two messages have parent {m.parent_id}")
+            path[m.parent_id] = m               #scorro i messaggi e metto ogni messaggio come figlio di quello che ha scritto nel parent id
+            
+    #percorriamo il path da root all'ultimo figlio  
+    walk = []      
+    previous = root[0]                          #prendo il primo padre
+    walk.append(previous)                       #appendo alla lista
+    while True:                                 #finché il messaggio corrente ha un figlio
+        child = path.get(previous.id)           #cerco il figlio (None se è l'ultimo)
+        if child is None:
+            break
+        walk.append(child)                      #append di suo figlio
+        previous = child                        #il figlio diventa il padre
+
+    if len(walk) != len(result):
+        raise InvariantError("inconsistent walk of the branch")
+    
+    return walk           
 
 
 def open_branch(

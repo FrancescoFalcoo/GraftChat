@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraftChat · core preview</title>
+<style>
+  :root {
+    /* warm anthracite surfaces, neon yellow for borders and details */
+    --bg: #24221F;            /* page */
+    --surface: #2E2B27;       /* cards, bubbles: one step lighter */
+    --surface-2: #1A1917;     /* insets: code, transcripts, bars: one step darker */
+    --neon: #FFF01F;
+    --border: color-mix(in srgb, var(--neon) 28%, transparent);
+    --text: #EFE9DF; --muted: #A59E93;
+    --user: var(--neon); --user-text: #24221F;
+    --ok: var(--neon); --err: #FF6B5A;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  ::selection { background: var(--neon); color: var(--bg); }
+
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 18px; padding: 10px 20px; background: var(--surface-2); border-bottom: 1px solid var(--neon); }
+  header.flash { animation: flash .9s ease-out; }
+  @keyframes flash { from { box-shadow: inset 0 -3px 0 var(--ok); } to { box-shadow: inset 0 -3px 0 transparent; } }
+  .brand { font-weight: 700; white-space: nowrap; color: var(--neon); }
+  .brand span { font-weight: 400; color: var(--muted); }
+  .progress { flex: 1; display: flex; align-items: center; gap: 10px; max-width: 440px; font-size: 13px; }
+  .bar { flex: 1; display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: color-mix(in srgb, var(--neon) 14%, transparent); }
+  .seg { display: block; height: 100%; }
+  .seg-ok { background: var(--ok); } .seg-error { background: var(--err); }
+  .err-count { color: var(--err); }
+  .live { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .live.on .dot { background: var(--ok); }
+  .live.off .dot { background: var(--err); }
+  .live.off { color: var(--err); }
+
+  main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  section { margin-bottom: 34px; }
+  h2 { font-size: 15px; margin: 0 0 2px; color: var(--neon); }
+  h2 code { font: 500 13px var(--mono); color: var(--muted); margin-left: 6px; }
+  .sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+
+  .fatal { margin-bottom: 20px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--err); background: color-mix(in srgb, var(--err) 8%, transparent); display: flex; flex-direction: column; gap: 8px; }
+  .fatal > strong { color: var(--err); }
+
+  /* sample conversation */
+  .sample { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 900px) { .sample { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .col-title { font-size: 12px; color: var(--muted); }
+  .col-title.main-title { color: var(--neon); }
+
+  .msg { display: flex; flex-direction: column; max-width: 85%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.assistant { align-self: flex-start; }
+  .msg.system { align-self: stretch; max-width: 100%; }
+  .bubble { padding: 8px 12px; border-radius: var(--radius); white-space: pre-wrap; word-break: break-word; }
+  .msg.user .bubble { background: var(--user); color: var(--user-text); border-bottom-right-radius: 4px; }
+  .msg.assistant .bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg.system .bubble { background: var(--surface-2); border: 1px dashed color-mix(in srgb, var(--neon) 60%, transparent); }
+  .msg.system .meta { color: var(--neon); }
+  .meta { font-size: 11px; color: var(--muted); margin: 2px 4px 0; }
+
+  mark { color: inherit; border-radius: 3px; }
+  mark.anchor { background: color-mix(in srgb, var(--c) 20%, transparent); border-bottom: 2px solid var(--c); padding: 0 2px; cursor: default; }
+  mark.anchor sup { color: var(--c); font-weight: 700; font-size: 10px; margin-left: 2px; }
+
+  .merge-node { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 4px 0; }
+  .merge-node::before, .merge-node::after { content: ""; flex: 1; border-top: 1px dashed var(--border); }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px; border-radius: 99px; font-size: 12px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: color-mix(in srgb, var(--c) 10%, transparent); color: var(--text); }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: none; }
+
+  .branch-card, .branch-mini { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 8px; transition: box-shadow .15s; }
+  .branch-card.discarded { opacity: .62; }
+  .branch-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .quote { margin: 0; padding: 4px 10px; border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 8%, transparent); border-radius: 0 6px 6px 0; font-style: italic; }
+  .thread { display: flex; flex-direction: column; gap: 6px; }
+  .thread .msg { max-width: 92%; }
+
+  .status { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+  .status-merged { color: var(--bg); background: var(--neon); font-weight: 600; }
+  .status-open { color: var(--neon); background: transparent; box-shadow: inset 0 0 0 1px var(--neon); }
+
+  .takeaway { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 7px; }
+  .takeaway.empty { color: var(--muted); font-size: 12px; font-style: italic; }
+  .takeaway-title { font-size: 11px; color: var(--muted); }
+  .point { display: flex; gap: 8px; align-items: flex-start; }
+  .check { width: 16px; height: 16px; flex: none; margin-top: 2px; border-radius: 4px; border: 1.5px solid var(--c, var(--ok)); display: grid; place-items: center; font-size: 11px; line-height: 1; color: var(--surface-2); font-weight: 700; }
+  .point.on .check { background: var(--c, var(--ok)); }
+  .point.off { opacity: .55; }
+  .point-title { font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .point-text { font-size: 13px; }
+  .pill { font-size: 10px; font-weight: 500; padding: 0 7px; border-radius: 99px; background: var(--surface-2); color: var(--muted); cursor: help; }
+
+  .linked { box-shadow: 0 0 0 2px var(--c) !important; }
+
+  /* function cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .card.wide { grid-column: 1 / -1; }
+  .card:hover { box-shadow: 0 0 0 1px var(--neon); }
+  .card.todo { background: transparent; border-style: dashed; }
+  .card.ok { border-left: 4px solid var(--ok); }
+  .card.error { border-left: 4px solid var(--err); }
+  .card.changed { animation: changed 1.8s ease-out; }
+  @keyframes changed { from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 65%, transparent); } to { box-shadow: 0 0 0 3px transparent; } }
+  .card-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .call { font: 600 13px var(--mono); white-space: nowrap; }
+  .args { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { margin-left: auto; font-size: 11px; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+  .badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .badge.error { color: var(--err); background: color-mix(in srgb, var(--err) 13%, transparent); }
+  .badge.todo { color: var(--muted); background: var(--surface-2); }
+  .hint { font-size: 12px; color: var(--muted); }
+  .card-body { margin-top: 4px; min-width: 0; }
+  .todo-body { display: flex; flex-direction: column; gap: 6px; }
+  .todo-body span { height: 8px; border-radius: 99px; background: var(--surface-2); }
+  .todo-body span:nth-child(2) { width: 70%; }
+
+  .error { background: color-mix(in srgb, var(--err) 8%, transparent); border: 1px solid color-mix(in srgb, var(--err) 35%, transparent); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .error-msg { color: var(--err); font: 600 13px var(--mono); white-space: pre-wrap; }
+  .frame { font-size: 12px; color: var(--muted); }
+  .frame code { font-family: var(--mono); color: var(--text); }
+  .frame pre { margin: 2px 0 0; font: 12px var(--mono); white-space: pre-wrap; }
+
+  pre.text { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.5 var(--mono); background: var(--surface-2); padding: 8px 10px; border-radius: 8px; }
+  .none { font-family: var(--mono); color: var(--muted); }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+
+  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .node { display: inline-flex; gap: 6px; align-items: center; padding: 3px 9px; border-radius: 8px; font-size: 12px; border: 1px solid var(--border); background: var(--surface); max-width: 100%; }
+  .node.user { background: var(--user); color: var(--user-text); border-color: transparent; }
+  .node.merge { border-style: dashed; color: var(--muted); }
+  .node[data-branch] { border-left: 3px solid var(--c); }
+  .node-id { font: 11px var(--mono); opacity: .6; }
+  .arrow { color: var(--muted); }
+
+  .transcript { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: var(--bg); }
+  mark.src { padding: 0 1px; }
+  mark.src-quote { background: transparent; border-bottom: 2px solid var(--c); }
+  mark.src-point { background: color-mix(in srgb, var(--c) 32%, transparent); box-shadow: inset 0 -2px 0 var(--c); }
+  mark.src-point-off, mark.src-point-gen { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 38%, transparent) 0 4px, transparent 4px 8px); outline: 1px dashed var(--c); }
+  mark.src-msg { background: transparent; outline: 1.5px dotted var(--c); outline-offset: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted); margin: -6px 0 14px; }
+
+  table.kv { border-collapse: collapse; font-size: 13px; }
+  table.kv th { text-align: left; color: var(--muted); font-weight: 500; padding: 1px 12px 1px 0; vertical-align: top; font-family: var(--mono); }
+  table.kv td { padding: 1px 0; }
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="brand">GraftChat <span>core preview</span></div>
+  <div class="progress" id="progress"></div>
+  <div class="live" id="live"><span class="dot"></span><span id="live-text">connessione…</span></div>
+</header>
+<main>
+  <div id="fatal"></div>
+  <section>
+    <h2>Conversazione di esempio</h2>
+    <p class="sub">I dati di partenza, come arriverebbero dal database. Non dipendono dal tuo codice: sono l'input di ogni funzione qui sotto.</p>
+    <div id="sample"></div>
+  </section>
+  <section>
+    <h2>Albero <code>core/tree.py</code></h2>
+    <p class="sub">Operazioni e invarianti sui thread e sui branch.</p>
+    <div class="cards" id="tree"></div>
+  </section>
+  <section>
+    <h2>Contesto <code>core/context.py</code></h2>
+    <p class="sub">Quello che il modello riceverebbe. I pezzi colorati provengono da un branch, col suo colore; passa il mouse per vedere l'origine.</p>
+    <div class="legend">
+      <span><mark class="src src-quote">passaggio citato</mark></span>
+      <span><mark class="src src-point">punto spuntato</mark></span>
+      <span><mark class="src src-point-off">punto non spuntato · testo generato poi modificato</mark></span>
+      <span><mark class="src src-msg">messaggio del branch</mark></span>
+    </div>
+    <div class="cards" id="context"></div>
+  </section>
+</main>
+<script>
+// Branch colour pool, handed out in creation order: each new branch takes the next
+// free colour and keeps it. Chosen for contrast on anthracite; no yellows (reserved
+// for the UI accent) and no light blues.
+const POOL = ['#FF6FAE', '#4ADE9C', '#FF9F5A', '#A78BFA', '#2DD4BF', '#D9A273'];
+const GOLDEN_ANGLE = 137.508;
+const YELLOW_HUES = [40, 80];
+let branchColors = new Map();
+
+// Beyond the pool: spread hues by the golden angle, skipping the yellow band.
+function generatedColor(n) {
+  let hue = (n * GOLDEN_ANGLE) % 360;
+  if (hue >= YELLOW_HUES[0] && hue <= YELLOW_HUES[1]) hue = (hue + GOLDEN_ANGLE) % 360;
+  return `hsl(${hue.toFixed(0)} 72% 68%)`;
+}
+
+function branchColor(id) {
+  const key = String(id ?? '');
+  if (!branchColors.has(key)) {
+    const n = branchColors.size;
+    branchColors.set(key, n < POOL.length ? POOL[n] : generatedColor(n));
+  }
+  return branchColors.get(key);
+}
+
+// Hand out colours to the conversation's branches, oldest first.
+function assignBranchColors(branches) {
+  branchColors = new Map();
+  [...branches]
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id)
+    .forEach(b => branchColor(b.id));
+}
+
+const ROLE_LABEL = { user: 'utente', assistant: 'modello', system: 'sistema', merge: 'merge' };
+const STATUS = { merged: ['✓', 'merged'], open: ['●', 'aperto'], discarded: ['✕', 'scartato'] };
+const BADGE = { ok: '✓ risponde', todo: 'da implementare', error: '✕ errore' };
+
+let NEEDLES = [];
+let previous = new Map();
+let shownVersion = null;
+
+const $ = id => document.getElementById(id);
+const shorten = (text, n) => (text || '').replace(/\s+/g, ' ').trim().replace(new RegExp(`^(.{${n}}).+$`), '$1…');
+
+function el(tag, props = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'style') node.style.cssText = v;
+    else node.setAttribute(k, v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    node.append(kid instanceof Node ? kid : String(kid));
+  }
+  return node;
+}
+
+/* ---- sample conversation ---------------------------------------------------- */
+
+function statusBadge(status) {
+  const [icon, label] = STATUS[status] || ['?', status];
+  return el('span', { class: `status status-${status}` }, `${icon} ${label}`);
+}
+
+function branchChip(b) {
+  return el('span', { class: 'chip', style: `--c:${branchColor(b.id)}`, 'data-branch': b.id },
+    el('span', { class: 'swatch' }), `Branch ${b.id}`);
+}
+
+function anchoredText(m, branches) {
+  const text = m.content || '';
+  const anchors = branches.filter(b => b.anchor_message_id === m.id)
+    .sort((a, b) => a.anchor_start - b.anchor_start);
+  const frag = document.createDocumentFragment();
+  let pos = 0;
+  for (const b of anchors) {
+    if (!(b.anchor_start >= pos && b.anchor_end <= text.length && b.anchor_end > b.anchor_start)) continue;
+    frag.append(text.slice(pos, b.anchor_start));
+    frag.append(el('mark', { class: 'anchor', style: `--c:${branchColor(b.id)}`, 'data-branch': b.id,
+      title: `Branch ${b.id} · ${(STATUS[b.status] || [, b.status])[1]}` },
+      text.slice(b.anchor_start, b.anchor_end), el('sup', {}, b.id)));
+    pos = b.anchor_end;
+  }
+  frag.append(text.slice(pos));
+  return frag;
+}
+
+function storedMessage(m, branches) {
+  if (m.role === 'merge') {
+    const merged = branches.filter(b => b.merge_message_id === m.id);
+    return el('div', { class: 'merge-node' }, '⤵ merge', merged.map(branchChip),
+      el('span', { class: 'node-id' }, `#${m.id}`));
+  }
+  return el('div', { class: `msg ${m.role}` },
+    el('div', { class: 'bubble' }, anchoredText(m, branches)),
+    el('div', { class: 'meta' }, `${ROLE_LABEL[m.role] || m.role} · #${m.id}`));
+}
+
+function point(p) {
+  const edited = p.text_final !== p.text_generated;
+  return el('div', { class: `point ${p.included ? 'on' : 'off'}` },
+    el('span', { class: 'check' }, p.included ? '✓' : ''),
+    el('div', {},
+      el('div', { class: 'point-title' }, p.title,
+        edited ? el('span', { class: 'pill', title: `Testo generato: ${p.text_generated}` }, 'modificato') : null),
+      el('div', { class: 'point-text' }, p.text_final)));
+}
+
+function checklist(points) {
+  if (!points.length) return el('div', { class: 'takeaway empty' }, 'take-away non ancora generato');
+  return el('div', { class: 'takeaway' },
+    el('div', { class: 'takeaway-title' }, 'take-away'),
+    [...points].sort((a, b) => a.position - b.position).map(point));
+}
+
+function branchCard(b, messages, points) {
+  return el('div', { class: `branch-card ${b.status}`, style: `--c:${branchColor(b.id)}`, 'data-branch': b.id },
+    el('div', { class: 'branch-head' },
+      el('span', { class: 'swatch' }), el('strong', {}, `Branch ${b.id}`), statusBadge(b.status),
+      b.merge_message_id != null ? el('span', { class: 'muted small' }, `merge al nodo #${b.merge_message_id}`) : null),
+    el('blockquote', { class: 'quote' }, b.anchor_quote),
+    el('div', { class: 'thread' }, messages.map(m => storedMessage(m, []))),
+    checklist(points));
+}
+
+function renderSample(sample) {
+  const { messages, branches, points } = sample;
+  return el('div', { class: 'sample' },
+    el('div', { class: 'col' },
+      el('div', { class: 'col-title main-title' }, 'main'),
+      messages.filter(m => m.branch_id == null).map(m => storedMessage(m, branches))),
+    el('div', { class: 'col' },
+      el('div', { class: 'col-title' }, 'branch'),
+      branches.map(b => branchCard(b,
+        messages.filter(m => m.branch_id === b.id),
+        points.filter(p => p.branch_id === b.id)))));
+}
+
+/* ---- provenance highlighting in returned text ------------------------------- */
+
+function buildNeedles(sample) {
+  const status = Object.fromEntries(sample.branches.map(b => [b.id, (STATUS[b.status] || [, b.status])[1]]));
+  const out = [];
+  const add = (text, branch, kind, label) => {
+    if (text && text.length >= 8) out.push({ text, branch, kind, label: `${label} · branch ${branch} (${status[branch]})` });
+  };
+  for (const b of sample.branches) add(b.anchor_quote, b.id, 'src-quote', 'passaggio citato');
+  for (const p of sample.points) {
+    add(p.text_final, p.branch_id, p.included ? 'src-point' : 'src-point-off',
+      `punto «${p.title}», ${p.included ? 'spuntato' : 'non spuntato'}`);
+    if (p.text_generated !== p.text_final)
+      add(p.text_generated, p.branch_id, 'src-point-gen', `testo generato del punto «${p.title}», poi modificato`);
+  }
+  for (const m of sample.messages)
+    if (m.branch_id != null) add(m.content, m.branch_id, 'src-msg', `messaggio #${m.id}`);
+  return out.sort((a, b) => b.text.length - a.text.length);
+}
+
+function highlight(text) {
+  const taken = [];
+  for (const n of NEEDLES) {
+    for (let i = text.indexOf(n.text); i !== -1; i = text.indexOf(n.text, i + n.text.length)) {
+      const j = i + n.text.length;
+      if (!taken.some(([s, e]) => i < e && j > s)) taken.push([i, j, n]);
+    }
+  }
+  taken.sort((a, b) => a[0] - b[0]);
+  const frag = document.createDocumentFragment();
+  let pos = 0;
+  for (const [s, e, n] of taken) {
+    frag.append(text.slice(pos, s));
+    frag.append(el('mark', { class: `src ${n.kind}`, style: `--c:${branchColor(n.branch)}`,
+      'data-branch': n.branch, title: n.label }, text.slice(s, e)));
+    pos = e;
+  }
+  frag.append(text.slice(pos));
+  return frag;
+}
+
+/* ---- values returned by core ------------------------------------------------ */
+
+function chain(messages) {
+  return el('div', { class: 'chain' }, messages.map((m, i) => [
+    i ? el('span', { class: 'arrow' }, '→') : null,
+    el('span', { class: `node ${m.role}`, title: m.content || '(nodo di merge)',
+      style: m.branch_id != null ? `--c:${branchColor(m.branch_id)}` : null, 'data-branch': m.branch_id },
+      el('span', { class: 'node-id' }, `#${m.id}`),
+      m.role === 'merge' ? '⤵ merge' : shorten(m.content, 26)),
+  ]));
+}
+
+function branchResult(b) {
+  const where = [`ancora: messaggio #${b.anchor_message_id}, caratteri ${b.anchor_start}–${b.anchor_end}`];
+  if (b.merge_message_id != null) where.push(`merge al nodo #${b.merge_message_id}`);
+  return el('div', { class: 'branch-mini', style: `--c:${branchColor(b.id)}`, 'data-branch': b.id },
+    el('div', { class: 'branch-head' }, el('span', { class: 'swatch' }), el('strong', {}, `Branch ${b.id}`), statusBadge(b.status)),
+    el('blockquote', { class: 'quote' }, b.anchor_quote ?? ''),
+    el('div', { class: 'muted small' }, where.join(' · ')));
+}
+
+function transcript(messages) {
+  return el('div', { class: 'transcript' },
+    el('div', { class: 'muted small' }, `${messages.length} messaggi inviati al modello`),
+    messages.map(m => el('div', { class: `msg ${m.role}` },
+      el('div', { class: 'bubble' }, highlight(m.content ?? '')),
+      el('div', { class: 'meta' }, ROLE_LABEL[m.role] || m.role))));
+}
+
+function keyValues(obj) {
+  return el('div', { class: 'stack' },
+    obj._type ? el('div', { class: 'muted small' }, obj._type) : null,
+    el('table', { class: 'kv' }, Object.entries(obj).filter(([k]) => k !== '_type').map(([k, v]) =>
+      el('tr', {}, el('th', {}, k), el('td', {}, v !== null && typeof v === 'object' ? value(v) : JSON.stringify(v))))));
+}
+
+function value(v) {
+  if (v === null || v === undefined) return el('span', { class: 'none' }, 'None');
+  if (typeof v === 'string')
+    return el('pre', { class: 'text' }, v === '' ? el('span', { class: 'muted' }, '"" (stringa vuota)') : highlight(v));
+  if (typeof v !== 'object') return el('code', { class: 'none' }, JSON.stringify(v));
+  if (Array.isArray(v)) {
+    if (!v.length) return el('span', { class: 'none' }, '[]  (lista vuota)');
+    if (v.every(x => x && x._type === 'Message')) return chain(v);
+    if (v.every(x => x && x._type === 'Branch')) return el('div', { class: 'stack' }, v.map(branchResult));
+    return el('div', { class: 'stack' }, v.map(value));
+  }
+  switch (v._type) {
+    case 'Context': return transcript(v.messages || []);
+    case 'ContextMessage': return transcript([v]);
+    case 'Message': return chain([v]);
+    case 'Branch': return branchResult(v);
+    case 'TakeawayPoint': return point(v);
+    case 'repr': return el('pre', { class: 'text' }, v.repr);
+  }
+  return keyValues(v);
+}
+
+function errorBox(e) {
+  return el('div', { class: 'error' },
+    el('div', { class: 'error-msg' }, e.message ? `${e.type}: ${e.message}` : e.type),
+    (e.frames || []).map(f => el('div', { class: 'frame' },
+      el('code', {}, `${f.file}:${f.line}`), ` in ${f.function}`,
+      f.code ? el('pre', {}, f.code) : null)));
+}
+
+function card(s, changed) {
+  const wide = s.group === 'context' && s.call.includes('build_');
+  const body = s.status === 'todo'
+    ? el('div', { class: 'todo-body' }, el('span'), el('span'))
+    : s.status === 'error' ? errorBox(s.error) : value(s.result);
+  return el('div', { class: `card ${s.status}${wide ? ' wide' : ''}${changed ? ' changed' : ''}` },
+    el('div', { class: 'card-head' },
+      el('code', { class: 'call' }, s.call), el('span', { class: 'args', title: s.args }, s.args),
+      el('span', { class: `badge ${s.status}` }, BADGE[s.status] || s.status)),
+    el('div', { class: 'hint' }, s.hint),
+    el('div', { class: 'card-body' }, body));
+}
+
+/* ---- page ------------------------------------------------------------------- */
+
+function progress(sections) {
+  const count = k => sections.filter(s => s.status === k).length;
+  const ok = count('ok'), err = count('error');
+  const width = k => (sections.length ? (100 * count(k)) / sections.length : 0);
+  return [
+    el('div', { class: 'bar' }, ['ok', 'error'].map(k => el('span', { class: `seg seg-${k}`, style: `width:${width(k)}%` }))),
+    el('span', {}, el('strong', {}, `${ok}/${sections.length}`), ' rispondono',
+      err ? el('span', { class: 'err-count' }, ` · ${err} ${err === 1 ? 'errore' : 'errori'}`) : null),
+  ];
+}
+
+function render(data, isUpdate) {
+  const sections = data.sections || [];
+  $('fatal').replaceChildren(data.fatal ? el('div', { class: 'fatal' },
+    el('strong', {}, data.fatal.title),
+    data.fatal.error ? errorBox(data.fatal.error) : null,
+    data.fatal.detail ? el('pre', { class: 'text' }, data.fatal.detail) : null) : '');
+
+  if (data.sample) {
+    assignBranchColors(data.sample.branches);
+    NEEDLES = buildNeedles(data.sample);
+    $('sample').replaceChildren(renderSample(data.sample));
+  }
+  const next = new Map();
+  const cards = { tree: [], context: [] };
+  for (const s of sections) {
+    const key = `${s.call}(${s.args})`;
+    const snapshot = JSON.stringify(s);
+    next.set(key, snapshot);
+    (cards[s.group] || cards.context).push(card(s, isUpdate && previous.get(key) !== snapshot));
+  }
+  previous = next;
+  $('tree').replaceChildren(...cards.tree);
+  $('context').replaceChildren(...cards.context);
+  $('progress').replaceChildren(...progress(sections));
+  $('live-text').textContent = `aggiornato alle ${data.generated_at || '—'}`;
+  if (isUpdate) {
+    const top = $('top');
+    top.classList.remove('flash'); void top.offsetWidth; top.classList.add('flash');
+  }
+}
+
+function setLive(on) {
+  $('live').className = `live ${on ? 'on' : 'off'}`;
+  if (!on) $('live-text').textContent = 'server non raggiungibile: live.py è fermo?';
+}
+
+async function tick() {
+  let data = null;
+  try {
+    const { version } = await (await fetch('/api/version', { cache: 'no-store' })).json();
+    if (version !== shownVersion) data = await (await fetch('/api/state', { cache: 'no-store' })).json();
+    setLive(true);
+  } catch {
+    setLive(false);
+  }
+  if (data) {
+    try {
+      render(data, shownVersion !== null);
+    } catch (err) {
+      $('fatal').replaceChildren(el('div', { class: 'fatal' },
+        el('strong', {}, 'Errore della pagina di anteprima (non del core)'), el('pre', { class: 'text' }, String(err.stack || err))));
+    }
+    shownVersion = data.version;
+  }
+  setTimeout(tick, 1000);
+}
+
+let hovered = null;
+document.addEventListener('mouseover', e => {
+  const b = e.target.closest?.('[data-branch]')?.getAttribute('data-branch') ?? null;
+  if (b === hovered) return;
+  hovered = b;
+  document.querySelectorAll('.linked').forEach(n => n.classList.remove('linked'));
+  if (b != null) document.querySelectorAll(`[data-branch="${CSS.escape(b)}"]`).forEach(n => n.classList.add('linked'));
+});
+
+document.querySelectorAll('.legend mark').forEach(m => m.style.setProperty('--c', POOL[0]));
+tick();
+</script>
+</body>
+</html>

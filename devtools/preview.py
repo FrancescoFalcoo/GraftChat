@@ -1,21 +1,24 @@
-"""Live preview of core/ on a sample conversation.
+"""Preview of core/ on a sample conversation.
 
 Dev tool, not part of core/ and not a test: it calls every core function on a
-fixed sample state and prints whatever comes back, so each change to core/ is
+fixed sample state and reports whatever comes back, so each change to core/ is
 visible as soon as the file is saved. It holds no expected results.
 
-    python devtools/preview.py                              # run once
+    python devtools/preview.py                              # run once, in the terminal
     watchfiles "python devtools/preview.py" core devtools   # re-run on every save
+    python devtools/preview.py --json                       # machine output, used by live.py
 """
 
 from __future__ import annotations
 
 import copy
+import json
 import sys
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -44,6 +47,23 @@ class Sample:
     messages: list
     branches: list
     points: list
+
+
+@dataclass
+class Section:
+    group: str  # "tree" | "context"
+    call: str  # function shown, e.g. "tree.thread"
+    args: str  # short description of the arguments
+    hint: str  # what the call is about, in plain words
+    run: Callable[[], object]
+
+
+@dataclass
+class Outcome:
+    section: Section
+    status: str  # "ok" | "todo" | "error"
+    value: object = None
+    error: dict | None = field(default=None)
 
 
 def build_sample(models) -> Sample:
@@ -114,7 +134,7 @@ def build_sample(models) -> Sample:
     return Sample(messages, branches, points)
 
 
-def sections(models, tree, context, sample: Sample) -> list[tuple[str, Callable[[], object]]]:
+def sections(models, tree, context, sample: Sample) -> list[Section]:
     """Every core call to preview, each on a fresh copy of the sample."""
 
     def fresh() -> Sample:
@@ -143,115 +163,202 @@ def sections(models, tree, context, sample: Sample) -> list[tuple[str, Callable[
         s = fresh()
         return context.build_branch_context(by_id(s.branches, bid), s.messages, s.branches, s.points)
 
+    def main_context():
+        s = fresh()
+        return context.build_main_context(s.messages, s.branches, s.points)
+
+    def check():
+        s = fresh()
+        return tree.check_invariants(s.messages, s.branches, s.points)
+
     return [
-        ("tree.thread(main)", lambda: tree.thread(fresh().messages)),
+        Section("tree", "tree.thread", "main", "Messaggi di main, dalla radice alla fine",
+                lambda: tree.thread(fresh().messages)),
         *[
-            (f"tree.thread(branch {bid})", lambda bid=bid: tree.thread(fresh().messages, bid))
+            Section("tree", "tree.thread", f"branch {bid}", f"Messaggi del branch {bid}, in ordine",
+                    lambda bid=bid: tree.thread(fresh().messages, bid))
             for bid in QUOTES
         ],
-        (f"tree.open_branch on «{NEW_QUOTE}»", open_new_branch),
-        ("tree.merge_branch(branch 2) at a new merge node #11", merge_open_branch),
-        ("tree.discard_branch(branch 2)", lambda: tree.discard_branch(by_id(fresh().branches, 2))),
-        ("tree.pending_branches", lambda: tree.pending_branches(fresh().branches)),
-        ("tree.check_invariants (sample state)",
-         lambda: tree.check_invariants(fresh().messages, fresh().branches, fresh().points)),
-        ("context.render_anchor_note(branch 2)",
-         lambda: context.render_anchor_note(QUOTES[2])),
-        ("context.render_merge_block(branch 1)",
-         lambda: context.render_merge_block(
-             QUOTES[1], [p for p in fresh().points if p.branch_id == 1])),
-        ("context.build_main_context",
-         lambda: context.build_main_context(fresh().messages, fresh().branches, fresh().points)),
+        Section("tree", "tree.open_branch", f"«{NEW_QUOTE}»",
+                "Nuovo branch su un passaggio della risposta #2", open_new_branch),
+        Section("tree", "tree.merge_branch", "branch 2, nodo #11",
+                "Branch 2 dopo il merge in un nuovo nodo in coda a main", merge_open_branch),
+        Section("tree", "tree.discard_branch", "branch 2", "Branch 2 dopo lo scarto",
+                lambda: tree.discard_branch(by_id(fresh().branches, 2))),
+        Section("tree", "tree.pending_branches", "tutti",
+                "Branch senza decisione di merge (quelli del banner)",
+                lambda: tree.pending_branches(fresh().branches)),
+        Section("tree", "tree.check_invariants", "stato di esempio",
+                "Validazione dell'intero stato: None = nessuna eccezione", check),
+        Section("context", "context.render_anchor_note", "branch 2",
+                "Nota che dice al modello di quale passaggio si parla",
+                lambda: context.render_anchor_note(QUOTES[2])),
+        Section("context", "context.render_merge_block", "branch 1",
+                "Blocco inserito in main al nodo di merge del branch 1",
+                lambda: context.render_merge_block(
+                    QUOTES[1], [p for p in fresh().points if p.branch_id == 1])),
+        Section("context", "context.build_main_context", "main",
+                "Cosa riceve il modello alla prossima chiamata su main", main_context),
         *[
-            (f"context.build_branch_context(branch {bid})", lambda bid=bid: branch_context(bid))
+            Section("context", "context.build_branch_context", f"branch {bid}",
+                    f"Cosa riceve il modello alla prossima chiamata nel branch {bid}",
+                    lambda bid=bid: branch_context(bid))
             for bid in QUOTES
         ],
     ]
 
 
-def show(value, indent: str = "  ") -> str:
-    """Readable rendering of whatever core returns."""
-    name = type(value).__name__
-    if value is None:
-        return f"{indent}{DIM}None{RESET}"
-    if isinstance(value, str):
-        return "\n".join(f"{indent}{line}" for line in (value.splitlines() or ['""']))
-    if isinstance(value, (list, tuple)):
-        return "\n".join(show(v, indent) for v in value) if value else f"{indent}[]"
-    if name == "Context" and hasattr(value, "messages"):
-        return f"{indent}{DIM}{len(value.messages)} messages{RESET}\n" + show(value.messages, indent)
-    if name == "ContextMessage":
-        return f"{indent}{BOLD}[{value.role}]{RESET}\n" + show(value.content, indent + "    ")
-    if name == "Message":
-        thread = "main" if value.branch_id is None else f"branch {value.branch_id}"
-        text = value.content.replace("\n", " ")
-        text = text if len(text) <= 60 else text[:57] + "..."
-        return f"{indent}#{value.id} {thread} {value.role} (parent {value.parent_id}): {text}"
-    if name == "Branch":
-        return (f"{indent}branch {value.id} [{value.status}] «{value.anchor_quote}» "
-                f"chars {value.anchor_start}-{value.anchor_end}, merge node {value.merge_message_id}")
-    if name == "TakeawayPoint":
-        box = "[x]" if value.included else "[ ]"
-        edited = "" if value.text_final == value.text_generated else f" {DIM}(edited){RESET}"
-        return f"{indent}{box} branch {value.branch_id} #{value.position} {value.title}: {value.text_final}{edited}"
-    if is_dataclass(value):
-        return "\n".join(f"{indent}{f.name} = {getattr(value, f.name)!r}" for f in fields(value))
-    return f"{indent}{value!r}"
-
-
-def print_error(exc: BaseException) -> None:
-    print(f"  {RED}{type(exc).__name__}: {exc}{RESET}")
+def error_info(exc: BaseException) -> dict:
+    """Exception type, message and the frames inside core/ (or the last frame)."""
     frames = traceback.extract_tb(exc.__traceback__)
     in_core = [f for f in frames if "core" in Path(f.filename).parts] or frames[-1:]
-    for frame in in_core:
-        print(f"  {DIM}{Path(frame.filename).name}:{frame.lineno} in {frame.name}: {frame.line}{RESET}")
+    return {
+        "type": type(exc).__name__,
+        "message": str(exc),
+        "frames": [
+            {"file": Path(f.filename).name, "line": f.lineno, "function": f.name, "code": f.line}
+            for f in in_core
+        ],
+    }
 
 
-def run(title: str, call: Callable[[], object]) -> str:
-    print(f"\n{BOLD}{CYAN}{title}{RESET}")
+def evaluate(section: Section) -> Outcome:
     try:
-        result = call()
+        value = section.run()
     except NotImplementedError:
-        print(f"  {YELLOW}da implementare{RESET}")
-        return "todo"
+        return Outcome(section, "todo")
     except Exception as exc:
-        print_error(exc)
-        return "error"
-    print(show(result))
-    return "ok"
+        return Outcome(section, "error", error=error_info(exc))
+    return Outcome(section, "ok", value=value)
 
 
-def main() -> int:
-    if sys.stdout.isatty():
-        print("\033[2J\033[3J\033[H", end="")
-    print(f"{BOLD}GraftChat core preview{RESET}  {DIM}{datetime.now():%H:%M:%S}{RESET}")
+def to_json(value):
+    """Generic conversion of core objects (dataclasses, enums, datetimes) to JSON."""
+    if isinstance(value, Enum):
+        return value.value
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [to_json(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): to_json(v) for k, v in value.items()}
+    if is_dataclass(value) and not isinstance(value, type):
+        return {"_type": type(value).__name__,
+                **{f.name: to_json(getattr(value, f.name)) for f in fields(value)}}
+    return {"_type": "repr", "repr": repr(value)}
 
+
+def collect() -> dict:
+    """Run everything and return the report as JSON-ready data."""
+    report = {"generated_at": datetime.now().strftime("%H:%M:%S"),
+              "fatal": None, "sample": None, "sections": []}
     try:
         import core.context as context
         import core.models as models
         import core.tree as tree
     except Exception as exc:
-        print(f"\n{RED}core/ non si importa{RESET}")
-        print_error(exc)
-        return 1
-
+        report["fatal"] = {"title": "core/ non si importa", "error": error_info(exc)}
+        return report
     try:
         sample = build_sample(models)
     except Exception as exc:
-        print(f"\n{RED}Il campione non corrisponde più a core/models.py: aggiorna build_sample{RESET}")
-        print_error(exc)
-        return 1
+        report["fatal"] = {"title": "Il campione non corrisponde più a core/models.py: "
+                                    "aggiorna build_sample in devtools/preview.py",
+                           "error": error_info(exc)}
+        return report
 
+    report["sample"] = to_json({"messages": sample.messages, "branches": sample.branches,
+                                "points": sample.points})
+    for outcome in map(evaluate, sections(models, tree, context, sample)):
+        s = outcome.section
+        report["sections"].append({
+            "group": s.group, "call": s.call, "args": s.args, "hint": s.hint,
+            "status": outcome.status, "result": to_json(outcome.value), "error": outcome.error,
+        })
+    return report
+
+
+# --- terminal output -------------------------------------------------------------
+
+
+def show(value, indent: str = "  ") -> str:
+    """Readable rendering of whatever core returns (JSON form)."""
+    kind = value.get("_type") if isinstance(value, dict) else None
+    if value is None:
+        return f"{indent}{DIM}None{RESET}"
+    if isinstance(value, str):
+        return "\n".join(f"{indent}{line}" for line in (value.splitlines() or ['""']))
+    if isinstance(value, list):
+        return "\n".join(show(v, indent) for v in value) if value else f"{indent}[]"
+    if kind == "Context":
+        return f"{indent}{DIM}{len(value['messages'])} messages{RESET}\n" + show(value["messages"], indent)
+    if kind == "ContextMessage":
+        return f"{indent}{BOLD}[{value['role']}]{RESET}\n" + show(value["content"], indent + "    ")
+    if kind == "Message":
+        thread = "main" if value["branch_id"] is None else f"branch {value['branch_id']}"
+        text = value["content"].replace("\n", " ")
+        text = text if len(text) <= 60 else text[:57] + "..."
+        return f"{indent}#{value['id']} {thread} {value['role']} (parent {value['parent_id']}): {text}"
+    if kind == "Branch":
+        return (f"{indent}branch {value['id']} [{value['status']}] «{value['anchor_quote']}» "
+                f"chars {value['anchor_start']}-{value['anchor_end']}, "
+                f"merge node {value['merge_message_id']}")
+    if kind == "TakeawayPoint":
+        box = "[x]" if value["included"] else "[ ]"
+        edited = "" if value["text_final"] == value["text_generated"] else f" {DIM}(edited){RESET}"
+        return (f"{indent}{box} branch {value['branch_id']} #{value['position']} "
+                f"{value['title']}: {value['text_final']}{edited}")
+    if kind == "repr":
+        return f"{indent}{value['repr']}"
+    if isinstance(value, dict):
+        return "\n".join(f"{indent}{k} = {v!r}" for k, v in value.items() if k != "_type")
+    return f"{indent}{value!r}"
+
+
+def print_error(error: dict) -> None:
+    print(f"  {RED}{error['type']}: {error['message']}{RESET}")
+    for f in error["frames"]:
+        print(f"  {DIM}{f['file']}:{f['line']} in {f['function']}: {f['code']}{RESET}")
+
+
+def print_report(report: dict) -> None:
+    if sys.stdout.isatty():
+        print("\033[2J\033[3J\033[H", end="")
+    print(f"{BOLD}GraftChat core preview{RESET}  {DIM}{report['generated_at']}{RESET}")
+    if report["fatal"]:
+        print(f"\n{RED}{report['fatal']['title']}{RESET}")
+        print_error(report["fatal"]["error"])
+        return
+
+    sample = report["sample"]
     print(f"\n{BOLD}Stato di esempio (input){RESET}")
-    print(show(sample.messages))
-    print(show(sample.branches))
-    print(show(sample.points))
+    for key in ("messages", "branches", "points"):
+        print(show(sample[key]))
 
-    results = [run(title, call) for title, call in sections(models, tree, context, sample)]
-    ok, todo, err = (results.count(s) for s in ("ok", "todo", "error"))
-    print(f"\n{BOLD}Funzioni che rispondono: {GREEN}{ok}{RESET}{BOLD}/{len(results)}{RESET}"
+    for s in report["sections"]:
+        print(f"\n{BOLD}{CYAN}{s['call']}({s['args']}){RESET}")
+        if s["status"] == "todo":
+            print(f"  {YELLOW}da implementare{RESET}")
+        elif s["status"] == "error":
+            print_error(s["error"])
+        else:
+            print(show(s["result"]))
+
+    statuses = [s["status"] for s in report["sections"]]
+    ok, todo, err = (statuses.count(k) for k in ("ok", "todo", "error"))
+    print(f"\n{BOLD}Funzioni che rispondono: {GREEN}{ok}{RESET}{BOLD}/{len(statuses)}{RESET}"
           f"   {YELLOW}da implementare: {todo}{RESET}   {RED}errori: {err}{RESET}")
-    return 0
+
+
+def main() -> int:
+    report = collect()
+    if "--json" in sys.argv[1:]:
+        sys.stdout.write(json.dumps(report, ensure_ascii=True))
+    else:
+        print_report(report)
+    return 1 if report["fatal"] else 0
 
 
 if __name__ == "__main__":
