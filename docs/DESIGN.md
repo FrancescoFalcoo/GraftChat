@@ -4,6 +4,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 
 Status: v1 design, frozen on 2026-11-01. Anything not listed in v1 scope is out of scope until v1 ships.
 Amended 2026-11-02: v1 provider changed from Anthropic to OpenRouter (free models) (§4, §8, §10).
+Amended 2026-11-13: added §14 Decisions (thread roots, empty threads, where merge blocks and anchor notes go, empty merges); §6 and §7 aligned.
 
 1. Problem
 
@@ -63,7 +64,7 @@ conversation(id, title, created_at)
 message(
   id, conversation_id,
   branch_id NULL,          -- NULL = main thread
-  parent_id NULL,          -- previous message in the same thread
+  parent_id NULL,          -- previous message in the same thread; NULL for the first message of main or of a branch (§14)
   role,                    -- user | assistant | merge
   content,
   created_at
@@ -101,7 +102,7 @@ Why keep text_generated and text_final apart: the experiment must measure the sy
 7. Context construction
 Main thread
 
-Walk the main messages from the root to the current end. At every merge node, insert the checked points of the branches merged there:
+Walk the main messages from the root to the current end. At every merge node, take the checked points of the branches merged there and prepend them, in explicit delimiters, to the next user message (§14). A merge with zero checked points injects nothing:
 
 [merged from branch on: «<anchor_quote>»]
 - <text_final of point 1>
@@ -111,7 +112,7 @@ The anchor_quote header keeps the "what was this about" link.
 
 Inside a branch
 Main messages from the root up to and including the anchor message (with any earlier merge nodes, so previously merged take-aways do propagate).
-A system note: "The user is asking about this specific passage of your previous answer: «<anchor_quote>»".
+An anchor note, prepended (in explicit delimiters) to the branch's first user message, not sent as a system message (§14): "The user is asking about this specific passage of your previous answer: «<anchor_quote>»".
 The branch's own messages.
 
 Sibling branches are not visible to each other (isolation).
@@ -148,3 +149,8 @@ Minimal UI: main chat + branch panel.
 Merge flow + take-away generation + banner.
 BYOK + spend cap + logging. → v1
 Experiment + report + README with 10-second GIF.
+14. Decisions
+A branch's first message has parent_id = None. parent_id always means "previous message in the same thread"; the link to main lives only in branch.anchor_message_id. This lets thread() treat main and branches identically.
+An empty thread returns [], not an error. A just-opened branch is a valid state; errors are reserved for corrupt data. An empty branch cannot be merged, only discarded.
+Merge blocks and anchor notes are prepended to the next user message, never sent as separate system messages (the Anthropic API takes the system prompt only as a separate top-level parameter; mid-conversation system messages behave inconsistently across providers). Blocks are wrapped in explicit delimiters.
+A merge with zero checked points injects nothing. For the model it is equivalent to exclusion; in the data the branch stays merged (needed for history and the experiment).
