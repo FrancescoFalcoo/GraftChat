@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
-from core.models import Branch, Message, TakeawayPoint
+from core.models import Branch, Message, TakeawayPoint, BranchStatus, Role
 
 
 class InvariantError(ValueError):
@@ -68,14 +68,7 @@ def thread(messages: Sequence[Message], branch_id: int | None = None) -> list[Me
     return walk           
 
 
-def open_branch(
-    anchor: Message,
-    start: int,
-    end: int,
-    *,
-    new_id: int,
-    created_at: datetime,
-) -> Branch:
+def open_branch(anchor: Message, start: int, end: int, *, new_id: int, created_at: datetime,) -> Branch:
     """Create an open branch anchored to ``anchor.content[start:end]``.
 
     The selected text is copied into ``anchor_quote``. Per DESIGN.md the anchor
@@ -84,7 +77,28 @@ def open_branch(
     Raises:
         InvariantError: if the anchor or the offsets are not valid.
     """
-    raise NotImplementedError
+    #controlli che vada tutto bene
+    if anchor.role != Role.ASSISTANT:               #LIMITE: solo branch su risposte del modello
+        raise InvariantError(f"message:{anchor.id} is not a response of the model")
+
+    if anchor.branch_id is not None:                #LIMITE: solo profondità 1 
+        raise InvariantError(f"message:{anchor.id} is not in main, but in {anchor.branch_id}")
+    
+    if not (0 <= start < end <= len(anchor.content)):
+        raise InvariantError(f"invalid selection [{start}:{end}]; message: {anchor.id} with {len(anchor.content)} charachters")
+
+    return Branch(
+        id=new_id,
+        conversation_id= anchor.conversation_id,
+        anchor_message_id= anchor.content[start:end],
+        anchor_start= start,
+        anchor_end= end,
+        anchor_quote= anchor.content,
+        status= BranchStatus.OPEN,
+        merge_message_id= None,
+        created_at= created_at
+    )
+
 
 
 def merge_branch(branch: Branch, merge_message: Message) -> Branch:
