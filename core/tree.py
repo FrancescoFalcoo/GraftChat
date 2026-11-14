@@ -85,15 +85,15 @@ def open_branch(anchor: Message, start: int, end: int, *, new_id: int, created_a
         raise InvariantError(f"message:{anchor.id} is not in main, but in {anchor.branch_id}")
     
     if not (0 <= start < end <= len(anchor.content)):
-        raise InvariantError(f"invalid selection [{start}:{end}]; message: {anchor.id} with {len(anchor.content)} charachters")
+        raise InvariantError(f"invalid selection [{start}:{end}]; message: {anchor.id} with {len(anchor.content)} characters")
 
     return Branch(
         id=new_id,
         conversation_id= anchor.conversation_id,
-        anchor_message_id= anchor.content[start:end],
+        anchor_message_id= anchor.id,
         anchor_start= start,
         anchor_end= end,
-        anchor_quote= anchor.content,
+        anchor_quote= anchor.content[start:end],
         status= BranchStatus.OPEN,
         merge_message_id= None,
         created_at= created_at
