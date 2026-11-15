@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from core.models import Branch, Message, TakeawayPoint, BranchStatus, Role
-
+from dataclasses import replace
 
 class InvariantError(ValueError):
     """Raised when an operation or a stored state would violate a tree invariant."""
@@ -100,18 +100,35 @@ def open_branch(anchor: Message, start: int, end: int, *, new_id: int, created_a
     )
 
 
+def merge_branch(branch: Branch, merge_message: Message, messages: Sequence[Message]) -> Branch:
+    """Return ``branch`` marked as merged at ``merge_message`` (DESIGN.md §14.6).
 
-def merge_branch(branch: Branch, merge_message: Message) -> Branch:
-    """Return ``branch`` marked as merged at ``merge_message``.
-
-    Per DESIGN.md the merge node is a ``merge`` message at the current end of
-    main (merging anywhere else is out of scope for v1).
+    ``messages`` are all the messages of the conversation, and must already
+    include ``merge_message``. The merge node is a ``merge`` message on main, in
+    the branch's conversation, at the current end of main (merging anywhere else
+    is out of scope for v1). Several branches may be merged at the same node.
+    Take-away points are not checked: a merge with zero checked points is valid.
 
     Raises:
-        InvariantError: if the branch is not open or the merge node is not valid.
+        InvariantError: if the branch is not open, the branch thread is empty,
+            or the merge node is not valid.
     """
-    raise NotImplementedError
-
+    if branch.status != BranchStatus.OPEN:
+        raise InvariantError(f"branch {branch.id} cannot be merged. is not OPEN but {branch.status}")
+    if merge_message.role != Role.MERGE:
+        raise InvariantError(f"message {merge_message.id} is not in role MERGE, but {merge_message.role}")
+    if merge_message.branch_id is not None:
+        raise InvariantError(f"the message {merge_message.id} is not in Main branch")
+    if merge_message.conversation_id != branch.conversation_id:
+        raise InvariantError(f"merge node {merge_message.id} is in conversation {merge_message.conversation_id}, branch {branch.id} in {branch.conversation_id}")
+    
+    #no merge di una lista vuota: thread restituisce [], con "not" è controllato
+    if not thread(messages, branch.id):
+        raise InvariantError(f"thread is empty! branch: {branch.id}, message: {merge_message.id}")
+    main = thread(messages)
+    if not main or main[-1].id != merge_message.id:             #confronto di ultimo messaggio per vedere se appartiene
+        raise InvariantError(f"the last message of main is {main[-1].id}")
+    return replace(branch, status=BranchStatus.MERGED, merge_message_id = merge_message.id )
 
 def discard_branch(branch: Branch) -> Branch:
     """Return ``branch`` marked as discarded.
@@ -121,8 +138,12 @@ def discard_branch(branch: Branch) -> Branch:
     Raises:
         InvariantError: if the branch is not open.
     """
-    raise NotImplementedError
+    #controllo se OPEN
+    if branch.status != BranchStatus.OPEN:                                                    
+        raise InvariantError(f"error of status: branch {branch.id} is {branch.status}")
 
+    #cambio lo stato del branch e lo restituisco
+    return replace(branch, status=BranchStatus.DISCARDED)
 
 def pending_branches(branches: Sequence[Branch]) -> list[Branch]:
     """Return the branches with no merge decision yet (drives the return-to-main banner)."""

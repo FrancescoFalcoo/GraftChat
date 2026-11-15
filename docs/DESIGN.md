@@ -5,6 +5,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 Status: v1 design, frozen on 2026-11-01. Anything not listed in v1 scope is out of scope until v1 ships.
 Amended 2026-11-02: v1 provider changed from Anthropic to OpenRouter (free models) (§4, §8, §10).
 Amended 2026-11-13: added §14 Decisions (thread roots, empty threads, where merge blocks and anchor notes go, empty merges); §6 and §7 aligned.
+Amended 2026-11-15: added §14.5 branch state machine and §14.6 merge_branch checks; restore, archive and multiple merges added to the v2 backlog (§10).
 
 1. Problem
 
@@ -134,6 +135,9 @@ Claude Code may review core code, not write it.
 Sequential merge at the graft point (Francesco's idea): merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows I learned branch 2's content). Note: this deliberately breaks sibling isolation. Worth testing as an experimental condition E.
 Depth > 1.
 Multiple panels, timeline/graph view, streaming, more providers (Anthropic, Gemini, Ollama).
+Trash & restore for discarded branches (DISCARDED → OPEN).
+Archive merged branches: a UI visibility flag, separate from status; take-aways stay in context.
+Multiple merges per branch: needs a merge_event table (id, branch_id, merge_message_id, up_to_message_id), take-aways attached to merge events instead of branches, and incremental summaries covering only messages since the previous merge.
 11. Experiment (after v1)
 Scenarios: 15–20, from real conversations with multi-point answers; each scripted as: main prompt → 2–3 anchored branches → a main follow-up that depends (or should not depend) on branch content.
 Conditions: A–D (§3), all with auto-generated, all-checked take-aways.
@@ -150,7 +154,11 @@ Merge flow + take-away generation + banner.
 BYOK + spend cap + logging. → v1
 Experiment + report + README with 10-second GIF.
 14. Decisions
-A branch's first message has parent_id = None. parent_id always means "previous message in the same thread"; the link to main lives only in branch.anchor_message_id. This lets thread() treat main and branches identically.
-An empty thread returns [], not an error. A just-opened branch is a valid state; errors are reserved for corrupt data. An empty branch cannot be merged, only discarded.
-Merge blocks and anchor notes are prepended to the next user message, never sent as separate system messages (the Anthropic API takes the system prompt only as a separate top-level parameter; mid-conversation system messages behave inconsistently across providers). Blocks are wrapped in explicit delimiters.
-A merge with zero checked points injects nothing. For the model it is equivalent to exclusion; in the data the branch stays merged (needed for history and the experiment).
+14.1 A branch's first message has parent_id = None. parent_id always means "previous message in the same thread"; the link to main lives only in branch.anchor_message_id. This lets thread() treat main and branches identically.
+14.2 An empty thread returns [], not an error. A just-opened branch is a valid state; errors are reserved for corrupt data. An empty branch cannot be merged, only discarded.
+14.3 Merge blocks and anchor notes are prepended to the next user message, never sent as separate system messages (the Anthropic API takes the system prompt only as a separate top-level parameter; mid-conversation system messages behave inconsistently across providers). Blocks are wrapped in explicit delimiters.
+14.4 A merge with zero checked points injects nothing. For the model it is equivalent to exclusion; in the data the branch stays merged (needed for history and the experiment).
+14.5 Branch state machine (v1): OPEN → MERGED and OPEN → DISCARDED; both are final. No restore, no discard after merge, no second merge. An empty branch cannot be merged (14.2).
+Rationale: discarding after a merge would either rewrite main's history (take-aways vanish after the model already relied on them) or be a pure UI concern (archiving), not a state. To resume a merged topic, open a new branch on the same passage: it sees main, including the earlier take-aways. Restore, archive and multiple merges are in the v2 backlog (§10).
+14.6 merge_branch takes the conversation's messages and enforces the merge rules inside core: merge_branch(branch, merge_message, messages). The merge node must already be in messages. Checks: the branch is OPEN (14.5); the merge node has role merge, is on main and belongs to the same conversation; the branch thread is not empty (14.2); the merge node is the last message of main (merging anywhere else is out of scope, §4). Several branches may be merged at the same node, as long as nothing follows it on main. Take-away points are not checked here: a merge with zero checked points is valid (14.4).
+Rationale: keeping these rules in core (not in api/) makes them unit-testable and part of the defensible core (§9); both checks reuse thread().
