@@ -729,3 +729,33 @@ def test_merge_waits_for_a_pending_reply_on_main(client, provider, summarised):
     client.post(f"/api/conversations/{conversation_id}/messages", json={"content": "unanswered"})
     response = merge(client, conversation_id, [branch_id])
     assert response.status_code == 409 and error_code(response) == "conflict"
+
+
+# --- the frontend ------------------------------------------------------------------------------
+
+
+def test_without_a_built_frontend_the_root_page_says_how_to_build_it(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "npm run build" in response.text
+
+
+def test_built_frontend_is_served_next_to_the_api(config, service, tmp_path):
+    from dataclasses import replace
+
+    from fastapi.testclient import TestClient
+
+    from api.app import create_app
+
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<!doctype html><title>built app</title>", encoding="utf-8")
+    (dist / "assets" / "app.js").write_text("console.log('hi')", encoding="utf-8")
+
+    with_frontend = TestClient(create_app(service, replace(config, web_dist=dist)))
+    assert "built app" in with_frontend.get("/").text
+    assert with_frontend.get("/assets/app.js").status_code == 200
+    assert with_frontend.get("/api/health").json()["ok"] is True
+    missing = with_frontend.get("/api/nope")
+    assert missing.status_code == 404 and missing.json()["error"]["code"] == "not_found"
