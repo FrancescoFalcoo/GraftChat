@@ -12,6 +12,8 @@ Environment variables:
     For UI work and demos.
 ``GRAFTCHAT_PORT``
     Port of ``python -m api``. Default: 8000.
+``GRAFTCHAT_WEB_DIST``
+    Folder of the built frontend to serve at ``/``. Default: ``web/dist``.
 ``OPENROUTER_API_KEY``
     If set, it wins over the key saved from the UI.
 """
@@ -45,6 +47,6 @@ def load_config() -> Config:
         home=home,
         db_path=db_path,
         fake_llm=os.environ.get("GRAFTCHAT_FAKE_LLM", "") not in ("", "0"),
-        web_dist=REPO_ROOT / "web" / "dist",
+        web_dist=Path(os.environ.get("GRAFTCHAT_WEB_DIST") or REPO_ROOT / "web" / "dist"),
         port=int(os.environ.get("GRAFTCHAT_PORT") or 8000),
     )
