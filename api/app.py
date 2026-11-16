@@ -11,7 +11,7 @@ import traceback
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -211,5 +211,28 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
     if (config.web_dist / "index.html").is_file():
         # The built frontend (npm run build), so one process serves everything.
         app.mount("/", StaticFiles(directory=config.web_dist, html=True), name="web")
+    else:
+
+        @app.get("/", response_class=HTMLResponse)
+        def frontend_missing() -> str:
+            return FRONTEND_MISSING_PAGE
 
     return app
+
+
+# Shown at "/" when web/ has not been built yet, instead of a bare 404.
+FRONTEND_MISSING_PAGE = """<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>GraftChat</title>
+<body style="font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem">
+<h1 style="font-size: 1.25rem">The backend is running, but the frontend has not been built yet.</h1>
+<p>Build it once, then restart <code>python -m api</code>:</p>
+<pre style="background: #eee; padding: 1rem">cd web
+npm install
+npm run build</pre>
+<p>While working on the frontend, run <code>npm run dev</code> in <code>web/</code> instead and open
+<a href="http://127.0.0.1:5173">http://127.0.0.1:5173</a>.</p>
+</body>
+</html>
+"""
