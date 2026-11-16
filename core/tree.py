@@ -7,10 +7,11 @@ by the caller (assigned by persistence, which lives outside ``core``).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 
-from core.models import Branch, Message, TakeawayPoint, BranchStatus, Role
-from dataclasses import replace
+from core.models import Branch, BranchStatus, Message, Role, TakeawayPoint
+
 
 class InvariantError(ValueError):
     """Raised when an operation or a stored state would violate a tree invariant."""
@@ -127,8 +128,10 @@ def merge_branch(branch: Branch, merge_message: Message, messages: Sequence[Mess
         raise InvariantError(f"thread is empty! branch: {branch.id}, message: {merge_message.id}")
     main = thread(messages)
     if not main or main[-1].id != merge_message.id:             #confronto di ultimo messaggio per vedere se appartiene
-        raise InvariantError(f"the last message of main is {main[-1].id}")
+        last = main[-1].id if main else None                    #main può essere vuoto: main[-1] darebbe IndexError
+        raise InvariantError(f"merge node {merge_message.id} is not the end of main (last message: {last})")
     return replace(branch, status=BranchStatus.MERGED, merge_message_id = merge_message.id )
+
 
 def discard_branch(branch: Branch) -> Branch:
     """Return ``branch`` marked as discarded.
@@ -145,9 +148,20 @@ def discard_branch(branch: Branch) -> Branch:
     #cambio lo stato del branch e lo restituisco
     return replace(branch, status=BranchStatus.DISCARDED)
 
+
 def pending_branches(branches: Sequence[Branch]) -> list[Branch]:
-    """Return the branches with no merge decision yet (drives the return-to-main banner)."""
-    raise NotImplementedError
+    """Return the branches with no merge decision yet (drives the return-to-main banner).
+
+    These are exactly the OPEN branches, in the order given: MERGED and
+    DISCARDED are final states (DESIGN.md §14.5). Empty branches are included:
+    they are still a pending decision, even if the only choice is to discard
+    them (§14.8).
+    """
+    pending = []
+    for b in branches:
+        if b.status == BranchStatus.OPEN:
+            pending.append(b)
+    return pending
 
 
 def check_invariants(
@@ -157,11 +171,133 @@ def check_invariants(
 ) -> None:
     """Validate the whole state of one conversation.
 
-    Rules stated in DESIGN.md include: depth = 1; ``anchor_quote`` matches the
-    anchor's selected text; a merged branch points to a ``merge`` node on main;
-    ``text_generated`` is never overwritten.
+    The other functions check one operation; this one checks everything that is
+    stored, for example right after loading it or before committing a change.
+
+    Messages:
+    - ids are unique, and messages and branches all belong to one conversation;
+    - a message's ``branch_id`` refers to an existing branch;
+    - ``merge`` messages are on main only;
+    - main and every branch thread form a single chain (see ``thread``).
+
+    Branches:
+    - ids are unique;
+    - the anchor exists, is an assistant message on main (depth = 1), the
+      offsets are inside it and ``anchor_quote`` is the selected text;
+    - ``merge_message_id`` is set if and only if the branch is MERGED;
+    - a merged branch points to a ``merge`` node on main, is not empty (§14.2),
+      and its merge node comes after its anchor.
+
+    Take-away points:
+    - ids are unique, and a point's branch exists, whatever its status (§14.9);
+    - positions are unique within a branch.
+
+    Not checked here: "``text_generated`` is never overwritten". One snapshot
+    cannot tell what a field contained before (§14.7).
 
     Raises:
         InvariantError: on the first violation found.
     """
-    raise NotImplementedError
+    _check_unique_ids(messages, "message")
+    _check_unique_ids(branches, "branch")
+    _check_unique_ids(points, "take-away point")
+    #ordine: prima i messaggi, perché i controlli sui branch usano i thread già validati
+    _check_messages(messages, branches)
+    _check_branches(messages, branches)
+    _check_points(branches, points)
+
+
+def _check_unique_ids(items: Sequence[Message] | Sequence[Branch] | Sequence[TakeawayPoint], what: str) -> None:
+    """Raise if two items share an id (a dict keyed by id would silently hide one)."""
+    seen = set()
+    for item in items:
+        if item.id in seen:
+            raise InvariantError(f"duplicate {what} id {item.id}")
+        seen.add(item.id)
+
+
+def _check_messages(messages: Sequence[Message], branches: Sequence[Branch]) -> None:
+    #tutto lo stato appartiene a una sola conversazione
+    conversation_ids = set()
+    for m in messages:
+        conversation_ids.add(m.conversation_id)
+    for b in branches:
+        conversation_ids.add(b.conversation_id)
+    if len(conversation_ids) > 1:
+        raise InvariantError(f"state mixes conversations {sorted(conversation_ids)}")
+
+    branch_ids = set()
+    for b in branches:
+        branch_ids.add(b.id)
+
+    for m in messages:
+        #messaggio orfano: thread() non lo vedrebbe mai, perché nessuno seleziona quel branch
+        if m.branch_id is not None and m.branch_id not in branch_ids:
+            raise InvariantError(f"message {m.id} is in branch {m.branch_id}, which does not exist")
+        #i merge node stanno solo sul main
+        if m.role == Role.MERGE and m.branch_id is not None:
+            raise InvariantError(f"merge node {m.id} is inside branch {m.branch_id}, not on main")
+
+    #ogni thread è una catena sola: thread() lancia InvariantError se non lo è
+    thread(messages)
+    for b in branches:
+        thread(messages, b.id)
+
+
+def _check_branches(messages: Sequence[Message], branches: Sequence[Branch]) -> None:
+    by_id = {}                                      #messaggio per id, per trovare anchor e merge node
+    for m in messages:
+        by_id[m.id] = m
+
+    position = {}                                   #posizione di ogni messaggio del main, dalla radice
+    for index, m in enumerate(thread(messages)):
+        position[m.id] = index
+
+    for b in branches:
+        #--- anchor: le stesse regole di open_branch
+        anchor = by_id.get(b.anchor_message_id)
+        if anchor is None:
+            raise InvariantError(f"branch {b.id}: anchor message {b.anchor_message_id} does not exist")
+        if anchor.branch_id is not None:            #profondità 1: niente branch di branch
+            raise InvariantError(f"branch {b.id}: anchor {anchor.id} is in branch {anchor.branch_id}, not on main")
+        if anchor.role != Role.ASSISTANT:
+            raise InvariantError(f"branch {b.id}: anchor {anchor.id} is not an assistant message")
+        if not (0 <= b.anchor_start < b.anchor_end <= len(anchor.content)):
+            raise InvariantError(f"branch {b.id}: invalid selection [{b.anchor_start}:{b.anchor_end}] in message {anchor.id}")
+        if anchor.content[b.anchor_start:b.anchor_end] != b.anchor_quote:
+            raise InvariantError(f"branch {b.id}: anchor_quote is not the selected text of message {anchor.id}")
+
+        #--- stato e merge node vanno insieme: MERGED <=> merge_message_id presente
+        if b.status != BranchStatus.MERGED:
+            if b.merge_message_id is not None:
+                raise InvariantError(f"branch {b.id} is {b.status} but has merge node {b.merge_message_id}")
+            continue                                #OPEN o DISCARDED: nient'altro da controllare
+
+        if b.merge_message_id is None:
+            raise InvariantError(f"branch {b.id} is merged but has no merge node")
+        node = by_id.get(b.merge_message_id)
+        if node is None:
+            raise InvariantError(f"branch {b.id}: merge node {b.merge_message_id} does not exist")
+        if node.role != Role.MERGE or node.branch_id is not None:
+            raise InvariantError(f"branch {b.id}: message {node.id} is not a merge node on main")
+        if not thread(messages, b.id):              #un branch vuoto non si può mergiare (§14.2)
+            raise InvariantError(f"branch {b.id} is merged but has no messages")
+        #un branch non può rientrare nel main prima del punto da cui è partito
+        if position[node.id] <= position[anchor.id]:
+            raise InvariantError(f"branch {b.id}: merge node {node.id} comes before its anchor {anchor.id}")
+
+
+def _check_points(branches: Sequence[Branch], points: Sequence[TakeawayPoint]) -> None:
+    branch_ids = set()
+    for b in branches:
+        branch_ids.add(b.id)
+
+    used = set()                                    #coppie (branch, posizione) già viste
+    for p in points:
+        #il branch deve esistere, in qualunque stato sia (§14.9)
+        if p.branch_id not in branch_ids:
+            raise InvariantError(f"take-away point {p.id} is in branch {p.branch_id}, which does not exist")
+        #due punti nella stessa posizione renderebbero ambiguo l'ordine della checklist
+        if (p.branch_id, p.position) in used:
+            raise InvariantError(f"branch {p.branch_id} has two take-away points at position {p.position}")
+        used.add((p.branch_id, p.position))
