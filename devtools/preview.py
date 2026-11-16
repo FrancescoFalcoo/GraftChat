@@ -157,7 +157,8 @@ def sections(models, tree, context, sample: Sample) -> list[Section]:
             id=11, conversation_id=1, branch_id=None, parent_id=10,
             role=models.Role.MERGE, content="", created_at=datetime(2026, 11, 2, 11, 0),
         )
-        return tree.merge_branch(by_id(s.branches, 2), merge_node)
+        # the merge node must already be among the messages (DESIGN §14.6)
+        return tree.merge_branch(by_id(s.branches, 2), merge_node, [*s.messages, merge_node])
 
     def branch_context(bid):
         s = fresh()
