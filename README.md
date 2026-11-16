@@ -17,9 +17,8 @@ The design, the research question behind it and every decision are in
 
 ## Status
 
-Work in progress (v1). `api/` and `web/` are complete; part of `core/` (the context builder
-and the whole-state checks) is still being written. Until then the app starts, and tells you
-which core functions are missing, but chatting returns an error.
+v1 is feature-complete: `core/`, `api/` and `web/` work end to end. Next is the experiment
+of DESIGN §11 (what should main receive after a branch?).
 
 ## Run it
 

@@ -6,7 +6,7 @@ Status: v1 design, frozen on 2026-11-01. Anything not listed in v1 scope is out 
 Amended 2026-11-02: v1 provider changed from Anthropic to OpenRouter (free models) (§4, §8, §10).
 Amended 2026-11-13: added §14 Decisions (thread roots, empty threads, where merge blocks and anchor notes go, empty merges); §6 and §7 aligned.
 Amended 2026-11-15: added §14.5 branch state machine and §14.6 merge_branch checks; restore, archive and multiple merges added to the v2 backlog (§10).
-Amended 2026-11-16: added §14.7–§14.9 (what check_invariants and pending_branches cover). api/ and web/ implemented against docs/API.md.
+Amended 2026-11-16: added §14.7–§14.10 (what check_invariants and pending_branches cover, context building details). api/ and web/ implemented against docs/API.md.
 
 1. Problem
 
@@ -166,3 +166,4 @@ Rationale: keeping these rules in core (not in api/) makes them unit-testable an
 14.7 check_invariants does not check "text_generated is never overwritten". It sees one snapshot of the state, so it cannot know what a field contained before. The rule is enforced where a point is edited: an edit changes only text_final (future core function edit_point; until then the API's PATCH /api/points/{id} can only write included and text_final).
 14.8 pending_branches returns every OPEN branch, empty ones included. An empty branch is still a pending decision; the UI offers "discard" instead of "merge" for it. Excluding them would complicate the signature for a marginal case; auto-discarding empty branches on return to main is a UI matter for v2.
 14.9 Take-away points may exist on any branch, not only merged ones: they are generated while the user is deciding (the checklist is shown before the merge is confirmed), so they exist on OPEN branches and stay on branches discarded afterwards. This is harmless: main's context uses only the points of MERGED branches. check_invariants therefore requires only that a point's branch exists.
+14.10 Context building details (core/context.py). Every block the app adds to a user message (a merge block or the anchor note) is wrapped on its own between the delimiters <context> and </context>, followed by a blank line and then what the user typed. Blocks of several branches merged at the same node are ordered by branch id, so the same state always gives the same context (needed for a reproducible experiment). render_merge_block returns the empty string when no point is checked, which is how 14.4 is applied. Blocks that have no user message after them yet (main ends on a merge node; a branch has no message) become a final user message of their own instead of being dropped, so nothing the user chose to bring back is ever hidden from the model.
