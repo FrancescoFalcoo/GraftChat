@@ -1,0 +1,325 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.modal-wide {
+  width: min(720px, 100%);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px 20px;
+}
+
+.modal-head h2 {
+  font-size: 17px;
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 20px 18px;
+  overflow-y: auto;
+}
+
+.modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-hint {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+/* Settings form */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="number"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.field input[readonly] {
+  background: var(--bg-sunken);
+  color: var(--text-soft);
+}
+
+.field .check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.field-note {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 12.5px;
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 13.5px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Merge dialog */
+.merge-intro {
+  margin-bottom: 12px;
+  font-size: 13.5px;
+}
+
+.merge-card {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.merge-card-merge {
+  border-color: var(--accent);
+}
+
+.merge-card-discard {
+  border-color: var(--danger);
+}
+
+.merge-quote {
+  max-height: 4.8em;
+  margin: 0 0 10px;
+  padding: 2px 10px;
+  overflow-y: auto;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-soft);
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.merge-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.merge-card-note {
+  margin-top: 10px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.segmented {
+  display: inline-flex;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.segment {
+  position: relative;
+  padding: 3px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.segment-on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.segment-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.segment:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.takeaway {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.takeaway-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.takeaway-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.takeaway-error p {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.takeaway-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.point {
+  border-radius: 8px;
+}
+
+.point:hover {
+  background: var(--bg-soft);
+}
+
+.point-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 6px;
+}
+
+.point-check {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.point-check input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.point-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.point-excluded .point-title {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+.point-edited {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.point-body {
+  padding: 2px 8px 10px 32px;
+}
+
+.point-body textarea {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.point-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}

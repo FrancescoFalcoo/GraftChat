@@ -1,0 +1,115 @@
+/*
+ * Message rendering. The DOM text is exactly the raw message (see markdown.ts), so
+ * nothing here may add or remove text: no ::before/::after content, markers are hidden
+ * with display:none and stay in the DOM.
+ */
+.md {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.md .ln {
+  min-height: 1.6em; /* a blank line still takes one line */
+}
+
+.md .mk {
+  display: none;
+}
+
+.md .lm {
+  color: var(--text-faint);
+}
+
+.md .ln-blank {
+  min-height: 0.9em;
+}
+
+.md .ln-h {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.md .ln-h1 {
+  font-size: 1.45em;
+}
+
+.md .ln-h2 {
+  font-size: 1.28em;
+}
+
+.md .ln-h3 {
+  font-size: 1.14em;
+}
+
+.md .ln-h4,
+.md .ln-h5,
+.md .ln-h6 {
+  font-size: 1em;
+}
+
+.md .ln-li {
+  margin-left: 0.4em;
+  padding-left: 1.5em;
+  text-indent: -1.5em;
+}
+
+.md .ln-bq {
+  padding-left: 12px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-soft);
+}
+
+.md code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+.md .cb {
+  padding: 0 12px;
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+
+.md .cb-first {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-radius: 8px 8px 0 0;
+}
+
+.md .cb-last {
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-radius: 0 0 8px 8px;
+}
+
+.md .cb-first.cb-last {
+  border-radius: 8px;
+}
+
+.md .ln-fence {
+  color: var(--text-faint);
+  font-size: 0.78em;
+}
+
+/* Anchored passages (CSS Custom Highlight API, see useAnchorHighlights.ts) */
+::highlight(graft-open) {
+  background-color: var(--hl-open);
+}
+
+::highlight(graft-merged) {
+  background-color: var(--hl-merged);
+}
+
+::highlight(graft-discarded) {
+  text-decoration: underline dotted;
+}
+
+::highlight(graft-active) {
+  background-color: var(--hl-active);
+}
