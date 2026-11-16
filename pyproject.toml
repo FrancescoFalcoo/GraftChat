@@ -8,7 +8,12 @@ version = "0.1.0"
 description = "Anchored branching chat for LLMs: graft side conversations onto any passage of an answer, then bring back only what matters."
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Francesco Falco" }]
+keywords = ["llm", "chat", "branching", "context-management"]
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/FrancescoFalcoo/GraftChat"
 
 [project.optional-dependencies]
 # Backend (api/): core/ itself has no dependencies.
