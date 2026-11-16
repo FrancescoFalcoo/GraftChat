@@ -1,11 +1,7 @@
 """Fixtures for the backend tests.
 
-The API is written against ``core``, part of which is still being implemented.
-So that these tests check the API and nothing else, the ``core`` functions the
-API calls for context building and whole-state checks are replaced by the small
-STAND-INS below. They are test doubles, not the real thing: deliberately naive,
-with their own obvious format, so nobody mistakes them for ``core.context``.
-The real functions are exercised by the tests in ``tests/`` proper.
+The API is tested on the real ``core``: these are integration tests of
+``api`` + ``core`` against a scripted provider (no network).
 """
 
 from __future__ import annotations
@@ -20,39 +16,14 @@ from api.config import Config
 from api.provider import ChatMessage, Completion, ModelInfo, ProviderError
 from api.service import Service
 from api.settings import ENV_KEY, SettingsStore
-from core import context, tree
-from core.context import Context, ContextMessage
-from core.models import BranchStatus, Role
 
 TEST_KEY = "sk-or-v1-test-key-0001"
 TEST_MODEL = "vendor/chat:free"
 
 
-def _plain(messages):
-    return [ContextMessage(m.role.value, m.content) for m in messages if m.role != Role.MERGE]
-
-
-def standin_main_context(messages, branches, points):
-    return Context(_plain(tree.thread(messages)))
-
-
-def standin_branch_context(branch, messages, branches, points):
-    main = tree.thread(messages)
-    upto = [m.id for m in main].index(branch.anchor_message_id) + 1
-    note = ContextMessage("user", f"<standin-anchor>{branch.anchor_quote}</standin-anchor>")
-    return Context([*_plain(main[:upto]), note, *_plain(tree.thread(messages, branch.id))])
-
-
-def standin_pending(branches):
-    return [b for b in branches if b.status == BranchStatus.OPEN]
-
-
 @pytest.fixture(autouse=True)
-def core_standins(monkeypatch):
-    monkeypatch.setattr(context, "build_main_context", standin_main_context)
-    monkeypatch.setattr(context, "build_branch_context", standin_branch_context)
-    monkeypatch.setattr(tree, "pending_branches", standin_pending)
-    monkeypatch.setattr(tree, "check_invariants", lambda messages, branches, points: None)
+def no_key_in_environment(monkeypatch):
+    """The developer's own OPENROUTER_API_KEY must not leak into the tests."""
     monkeypatch.delenv(ENV_KEY, raising=False)
 
 

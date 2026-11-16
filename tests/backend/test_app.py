@@ -1,7 +1,7 @@
 """End-to-end tests of the HTTP API (docs/API.md) against a scripted provider.
 
-``core.tree`` is the real one for thread/open/merge/discard; the context
-builders and whole-state checks are the stand-ins of ``conftest.py``.
+``core`` is the real one: these tests also check that the API hands the model
+exactly the context ``core.context`` builds.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ def test_health_reports_core_functions(client, monkeypatch):
     body = client.get("/api/health").json()
     assert body["ok"] is True
     assert body["core"]["core.tree.pending_branches"] is False
-    assert body["core"]["core.context.build_main_context"] is True  # the stand-in
+    assert body["core"]["core.context.build_main_context"] is True
 
 
 def test_settings_never_return_the_key(client):
@@ -430,8 +430,13 @@ def test_branch_chat_is_its_own_thread_and_gets_the_branch_context(client, provi
     assert len(state["main"]) == 2  # main untouched
     assert state["conversation"]["title"] == "Explain three things"
 
+    # DESIGN §7: main up to the anchor, the anchor note on the branch's first
+    # user message, then the branch's own messages
     prompt = provider.calls[-1][1]
-    assert "<standin-anchor>Second point</standin-anchor>" in [m.content for m in prompt]
+    assert [m.role for m in prompt] == ["user", "assistant", "user", "assistant", "user"]
+    assert prompt[1].content == answer["content"]
+    note = context.render_anchor_note("Second point")
+    assert prompt[2].content == "\n".join([context.BLOCK_START, note, context.BLOCK_END, "", "why?"])
     assert prompt[-1].content == "more?"
 
 
@@ -620,6 +625,16 @@ def test_merge_appends_a_merge_node_and_closes_the_branch(client, provider, summ
     assert [m["role"] for m in state["main"]] == ["user", "assistant", "merge", "user", "assistant"]
     assert state["main"][3]["parent_id"] == node["id"]
 
+    # the model receives only the ticked point, in front of what the user typed (DESIGN §7);
+    # the stored message stays exactly what the user typed
+    sent = provider.calls[-1][1][-1].content
+    header = context.MERGE_HEADER.format(anchor_quote="Second point")
+    assert sent == "\n".join(
+        [context.BLOCK_START, header, "- Y is solved.", context.BLOCK_END, "", "back on main"]
+    )
+    assert "X was added." not in " ".join(m.content for m in provider.calls[-1][1])
+    assert state["main"][3]["content"] == "back on main"
+
 
 def test_merged_branch_is_frozen(client, summarised):
     conversation_id, branch_id, points = summarised
@@ -669,12 +684,14 @@ def test_merging_again_before_main_continues_reuses_the_node(client, provider, c
     assert len({b["merge_message_id"] for b in state["branches"]}) == 1
 
 
-def test_merge_with_no_checked_point_is_valid(client, summarised):
+def test_merge_with_no_checked_point_is_valid(client, provider, summarised):
     conversation_id, branch_id, points = summarised
     for point in points:
         client.patch(f"/api/points/{point['id']}", json={"included": False})
     state = merge(client, conversation_id, [branch_id]).json()
     assert state["branches"][0]["status"] == "merged"  # DESIGN §14.4
+    say(client, conversation_id, "back on main")
+    assert provider.calls[-1][1][-1].content == "back on main"  # nothing injected
 
 
 def test_merge_refusals_change_nothing(client, provider, chat):
