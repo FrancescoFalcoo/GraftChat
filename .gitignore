@@ -17,3 +17,12 @@ dist/
 
 # Frontend (web/)
 node_modules/
+
+# Local Claude Code tooling (skills, settings)
+.claude/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
