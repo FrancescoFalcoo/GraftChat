@@ -143,6 +143,12 @@ def test_free_models_are_filtered_and_sorted():
             "pricing": free,
             "architecture": {"output_modalities": ["image"]},
         },
+        {
+            "id": "music/free",
+            "name": "Music",
+            "pricing": free,
+            "architecture": {"output_modalities": ["text", "audio"]},
+        },
         {"id": "x/nopricing", "name": "X"},
         "garbage",
     ]

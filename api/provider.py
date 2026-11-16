@@ -200,12 +200,13 @@ def _is_free(model: dict) -> bool:
         return False
 
 
-def _outputs_text(model: dict) -> bool:
+def _outputs_text_only(model: dict) -> bool:
+    """True for chat models: the output is text and nothing else (no audio or image generators)."""
     architecture = model.get("architecture")
     if not isinstance(architecture, dict):
         return True
     outputs = architecture.get("output_modalities")
-    return "text" in outputs if isinstance(outputs, list) else True
+    return outputs == ["text"] if isinstance(outputs, list) else True
 
 
 def fetch_free_models(client: httpx.Client | None = None) -> list[ModelInfo]:
@@ -222,7 +223,7 @@ def fetch_free_models(client: httpx.Client | None = None) -> list[ModelInfo]:
     for model in data:
         if not isinstance(model, dict) or not isinstance(model.get("id"), str):
             continue
-        if not (_is_free(model) and _outputs_text(model)):
+        if not (_is_free(model) and _outputs_text_only(model)):
             continue
         context = model.get("context_length")
         models.append(

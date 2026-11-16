@@ -64,5 +64,4 @@ The server binds to `127.0.0.1` only: it has no authentication and it holds the 
 python -m pytest tests/backend
 ```
 
-They replace the context builders with stand-ins (`tests/backend/conftest.py`) so they test
-the API, not `core`.
+They run the API on the real `core` against a scripted provider: no network, no key.
