@@ -1,6 +1,7 @@
 # GraftChat
 
 [![CI](https://github.com/FrancescoFalcoo/GraftChat/actions/workflows/ci.yml/badge.svg)](https://github.com/FrancescoFalcoo/GraftChat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Anchored branching chat for LLMs.** Graft a side conversation onto any passage of an
 answer, then bring back only what matters.
@@ -122,3 +123,7 @@ and call logging all work end to end. Next comes the experiment.
 
 Out of scope for v1, by design: branches of branches, streaming, several providers, editing
 past messages. The backlog is in [DESIGN.md §10](docs/DESIGN.md#10-v2-backlog).
+
+## License
+
+[MIT](LICENSE) © 2026 Francesco Falco
