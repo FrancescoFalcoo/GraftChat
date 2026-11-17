@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, toApiError } from "../api";
-import { laneOf } from "../lanes";
+import { branchColors } from "../lanes";
 import type { MergeFocus } from "../hooks/useGraft";
 import type { Branch, ConversationState } from "../types";
 import { MergeBranchCard, type Decision, type TakeawayStatus } from "./MergeBranchCard";
@@ -13,7 +13,8 @@ interface Props {
   /** Every mutating call returns the fresh state: it replaces the whole one. */
   onState: (state: ConversationState) => void;
   onClose: () => void;
-  onApplied: () => void;
+  /** `merged` is false when the dialog only discarded branches. */
+  onApplied: (merged: boolean) => void;
   onError: (error: unknown) => void;
   /** Called after each take-away call (the month spend may have changed). */
   onModelCall: () => void;
@@ -38,6 +39,7 @@ export function MergeDialog({
   onModelCall,
 }: Props) {
   const open = state.branches.filter((b) => b.status === "open");
+  const colors = branchColors(state.branches);
   const [decisions, setDecisions] = useState(() => initialDecisions(open, focus));
   const [takeaways, setTakeaways] = useState<Record<number, TakeawayStatus>>({});
   const [busyPoints, setBusyPoints] = useState<ReadonlySet<number>>(new Set());
@@ -118,7 +120,7 @@ export function MergeDialog({
     try {
       for (const id of discardIds) onState(await api.discardBranch(id));
       if (mergeIds.length > 0) onState(await api.merge(state.conversation.id, mergeIds));
-      onApplied();
+      onApplied(mergeIds.length > 0);
     } catch (e) {
       onError(e);
       setApplying(false);
@@ -171,7 +173,7 @@ export function MergeDialog({
         <MergeBranchCard
           key={b.id}
           branch={b}
-          lane={laneOf(state.branches, b.id)}
+          color={colors.get(b.id)}
           decision={decisionOf(b)}
           takeaway={takeaways[b.id] ?? null}
           anyGenerating={generating}

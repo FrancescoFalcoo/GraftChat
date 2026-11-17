@@ -1,4 +1,5 @@
 import { layoutConversationMap, type MapNode } from "../conversationMap";
+import type { CSSProperties } from "react";
 import type { BranchStatus, ConversationState } from "../types";
 import { Modal } from "./Modal";
 
@@ -17,6 +18,11 @@ const STATUS_WORD: Record<BranchStatus, string> = {
   discarded: "discarded",
 };
 
+/** The branch colour as --c (nothing for main). */
+function colorStyle(color: string | null): CSSProperties {
+  return color === null ? {} : ({ "--c": color } as CSSProperties);
+}
+
 function Node({ node, onJump, onOpenBranch }: { node: MapNode } & Omit<Props, "state" | "onClose">) {
   const click = (): void => {
     if (node.messageId !== null) onJump(node.messageId, node.branchId);
@@ -26,8 +32,8 @@ function Node({ node, onJump, onOpenBranch }: { node: MapNode } & Omit<Props, "s
     <button
       type="button"
       className={`map-node map-node-${node.kind}`}
-      style={{ left: node.x, top: node.y }}
-      data-lane={node.lane ?? undefined}
+      style={{ left: node.x, top: node.y, ...colorStyle(node.color) }}
+      data-branch={node.branchId ?? undefined}
       data-status={node.status ?? undefined}
       title={node.full}
       aria-label={node.kind === "merge" ? "Go to this merge" : `Go to: ${node.full}`}
@@ -60,8 +66,9 @@ export function ConversationMap({ state, onJump, onOpenBranch, onClose }: Props)
                 <path
                   key={e.key}
                   d={e.d}
-                  className={e.lane === null ? "map-trunk" : "map-edge"}
-                  data-lane={e.lane ?? undefined}
+                  className={e.branchId === null ? "map-trunk" : "map-edge"}
+                  style={colorStyle(e.color)}
+                  data-branch={e.branchId ?? undefined}
                   data-status={e.status ?? undefined}
                 />
               ))}
@@ -71,8 +78,8 @@ export function ConversationMap({ state, onJump, onOpenBranch, onClose }: Props)
                 key={`label-${b.branchId}`}
                 type="button"
                 className="map-branch-label"
-                style={{ left: b.x, top: b.y }}
-                data-lane={b.lane}
+                style={{ left: b.x, top: b.y, ...colorStyle(b.color) }}
+                data-branch={b.branchId}
                 data-status={b.status}
                 aria-label={`Open the branch on «${b.quote}» (${STATUS_WORD[b.status]})`}
                 onClick={() => onOpenBranch(b.branchId)}

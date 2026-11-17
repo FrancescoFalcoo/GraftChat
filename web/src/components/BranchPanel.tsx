@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { PendingRequest } from "../hooks/useGraft";
-import { plainQuote } from "../lanes";
+import { branchProps, plainQuote } from "../lanes";
 import type { Branch } from "../types";
 import { Composer } from "./Composer";
 import { ForkIcon } from "./Marks";
@@ -8,8 +8,8 @@ import { isAwaitingReply, ThreadView } from "./ThreadView";
 
 interface Props {
   branch: Branch;
-  /** Lane colour of the branch (lanes.ts): the rail down the panel's left edge. */
-  lane: number;
+  /** Colour of the branch (lanes.ts): the rail down the panel's left edge. */
+  color: string;
   pending: PendingRequest | null;
   onClose: () => void;
   onSend: (text: string) => Promise<boolean>;
@@ -27,7 +27,7 @@ const STATUS_WORD: Record<Branch["status"], string> = {
 
 export function BranchPanel({
   branch,
-  lane,
+  color,
   pending,
   onClose,
   onSend,
@@ -54,13 +54,18 @@ export function BranchPanel({
   };
 
   return (
-    <aside className="panel" aria-label="Branch" data-lane={lane} data-status={branch.status}>
+    <aside
+      className="panel"
+      aria-label="Branch"
+      {...branchProps(color, branch.id)}
+      data-status={branch.status}
+    >
       <header className="panel-head">
         <div className="panel-title">
           <h2>
             <ForkIcon /> Branch
           </h2>
-          <span className={`pill pill-${branch.status}`}>{STATUS_WORD[branch.status]}</span>
+          <span className={`status status-${branch.status}`}>{STATUS_WORD[branch.status]}</span>
           <button type="button" className="btn btn-small panel-close" onClick={onClose}>
             Close
           </button>

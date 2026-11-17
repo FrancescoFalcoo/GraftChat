@@ -7,7 +7,7 @@
  * node. Pure layout: components/ConversationMap.tsx draws the result.
  */
 
-import { laneOf, plainQuote } from "./lanes";
+import { branchColors, plainQuote } from "./lanes";
 import type { BranchStatus, ConversationState } from "./types";
 import { truncate } from "./util";
 
@@ -51,7 +51,8 @@ export interface MapNode {
   messageId: number | null;
   /** null = main. */
   branchId: number | null;
-  lane: number | null;
+  /** Branch colour (lanes.ts); null = main. */
+  color: string | null;
   status: BranchStatus | null;
 }
 
@@ -59,14 +60,16 @@ export interface MapEdge {
   key: string;
   /** SVG path. */
   d: string;
-  /** null = the trunk. */
-  lane: number | null;
+  /** Branch id; null = the trunk. */
+  branchId: number | null;
+  /** Branch colour; null = the trunk. */
+  color: string | null;
   status: BranchStatus | null;
 }
 
 export interface MapBranchLabel {
   branchId: number;
-  lane: number;
+  color: string;
   status: BranchStatus;
   quote: string;
   x: number;
@@ -89,7 +92,7 @@ interface MainNode {
 
 interface BranchPlan {
   id: number;
-  lane: number;
+  color: string;
   status: BranchStatus;
   quote: string;
   anchor: number; // index in mainNodes
@@ -120,13 +123,14 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
   }
   const mergeIndex = new Map(mainNodes.map((n, i) => [n.messageId, i]));
 
+  const colors = branchColors(state.branches);
   const plans: BranchPlan[] = [];
   for (const b of state.branches) {
     const anchor = anchorOf.get(b.anchor_message_id);
     if (anchor === undefined) continue;
     plans.push({
       id: b.id,
-      lane: laneOf(state.branches, b.id),
+      color: colors.get(b.id)!,
       status: b.status,
       quote: truncate(plainQuote(b.anchor_quote), 34),
       anchor,
@@ -196,7 +200,8 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
     edges.push({
       key: "trunk",
       d: `M ${x0} ${y(mainRow[0])} V ${y(mainRow[mainRow.length - 1])}`,
-      lane: null,
+      branchId: null,
+      color: null,
       status: null,
     });
     mainNodes.forEach((n, i) => {
@@ -209,7 +214,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         full: n.kind === "merge" ? "Merge node" : n.content,
         messageId: n.messageId,
         branchId: null,
-        lane: null,
+        color: null,
         status: null,
       });
     });
@@ -229,11 +234,11 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
       const back = (ym - yl) * 0.6;
       d += ` C ${xb} ${yl + back}, ${x0} ${ym - back}, ${x0} ${ym}`;
     }
-    edges.push({ key: `branch-${p.id}`, d, lane: p.lane, status: p.status });
+    edges.push({ key: `branch-${p.id}`, d, branchId: p.id, color: p.color, status: p.status });
 
     branchLabels.push({
       branchId: p.id,
-      lane: p.lane,
+      color: p.color,
       status: p.status,
       quote: p.quote,
       x: xb,
@@ -250,7 +255,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         full: `Branch on «${p.quote}», no messages yet`,
         messageId: null,
         branchId: p.id,
-        lane: p.lane,
+        color: p.color,
         status: p.status,
       });
     }
@@ -264,7 +269,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         full: m.content,
         messageId: m.messageId,
         branchId: p.id,
-        lane: p.lane,
+        color: p.color,
         status: p.status,
       });
     });

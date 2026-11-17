@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { LANE_COUNT, laneOf, plainQuote } from "../lanes";
+import { plainQuote } from "../lanes";
+import { highlightName } from "./useAnchorHighlights";
 import { offsetsToRange } from "../selection";
 import type { ConversationState } from "../types";
 
@@ -9,8 +10,6 @@ const CLICK_DELAY_MS = 260;
 type HighlightRegistry = Map<string, unknown>;
 type HighlightInstance = { priority: number };
 type HighlightCtor = new (...ranges: Range[]) => HighlightInstance;
-
-const HOVER_NAMES = Array.from({ length: LANE_COUNT }, (_, lane) => `graft-l${lane}-hover`);
 
 export interface AnchorCandidate {
   branchId: number;
@@ -36,7 +35,6 @@ interface Hit {
   branchId: number;
   root: HTMLElement;
   range: Range;
-  lane: number;
   quote: string;
 }
 
@@ -90,7 +88,6 @@ export function useAnchorClicks(
         branchId,
         root,
         range: ranges.get(branchId)!,
-        lane: laneOf(state.branches, branchId),
         quote: plainQuote(branch.anchor_quote),
       };
     };
@@ -100,7 +97,7 @@ export function useAnchorClicks(
       if (!hovered) return;
       hovered.root.classList.remove("anchor-hover");
       hovered.root.removeAttribute("title");
-      if (registry) for (const name of HOVER_NAMES) registry.delete(name);
+      registry?.delete(highlightName(hovered.branchId, "hover"));
       hovered = null;
     };
     const setHover = (hit: Hit | null): void => {
@@ -113,7 +110,7 @@ export function useAnchorClicks(
       if (registry && Highlight) {
         const highlight = new Highlight(hit.range);
         highlight.priority = 1; // above the status tint
-        registry.set(`graft-l${hit.lane}-hover`, highlight);
+        registry.set(highlightName(hit.branchId, "hover"), highlight);
       }
     };
 

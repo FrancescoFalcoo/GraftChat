@@ -24,9 +24,10 @@
   align-items: center;
   gap: var(--space-3);
   padding: 0 var(--space-2) 0 var(--space-4);
-  border-bottom: 1px solid var(--rule);
-  background: var(--wash);
-  font-size: var(--text-s);
+  border-bottom: 1px solid color-mix(in srgb, var(--err) 35%, transparent);
+  background: color-mix(in srgb, var(--err) 8%, var(--surface-2));
+  color: var(--err);
+  font: 12px var(--mono);
 }
 
 .dev-notice span {
@@ -41,7 +42,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
   user-select: none;
 }
 
@@ -61,9 +63,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-l);
+  color: var(--neon);
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
 .mark {
@@ -73,22 +75,23 @@
 }
 
 .mark-trunk {
-  stroke: var(--ink);
+  stroke: var(--neon);
   stroke-width: 2.2;
 }
 
 .mark-lane {
-  stroke: var(--lane-0);
+  stroke: #ff6fae; /* the first branch colour */
   stroke-width: 2.2;
 }
 
 .tag-fake {
   margin-left: auto;
+  white-space: nowrap;
   padding: 1px var(--space-2);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius-tape);
-  color: var(--ink-soft);
-  font-size: var(--text-s);
+  border-radius: var(--radius-pill);
+  color: var(--neon);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -121,13 +124,13 @@
 }
 
 .conv-item:hover {
-  background: var(--wash);
+  background: var(--surface);
 }
 
 .conv-active,
 .conv-active:hover {
-  background: var(--wash);
-  box-shadow: inset 3px 0 0 var(--ink);
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--neon);
   font-weight: 600;
 }
 
@@ -140,13 +143,13 @@
 }
 
 /* Open branches waiting for a decision. */
-.badge {
+.conv-badge {
   flex: none;
   min-width: 20px;
   padding: 0 var(--space-1);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius-tape);
-  color: var(--ink);
+  border-radius: var(--radius-pill);
+  color: var(--neon);
+  box-shadow: inset 0 0 0 1px var(--neon);
   font-size: var(--text-s);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -156,33 +159,32 @@
 
 .sidebar-bottom {
   padding: var(--space-3) var(--space-4) var(--space-4);
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--border);
 }
 
 .spend-line {
   min-height: 1.45em;
   margin-top: var(--space-2);
-  color: var(--ink-soft);
+  color: var(--muted);
   font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
 }
 
 /*
- * Branch side panel. Its left edge is the branch's tape: a solid rail in the lane
- * colour, with the nodes of the branch's own turns sitting on it.
+ * Branch side panel: a card in the branch colour, its left edge a 4px rail with the
+ * nodes of the branch's own turns sitting on it.
  */
 .panel {
-  --seam: 4px;
-  --axis: calc(var(--seam) + var(--tape-w) / 2);
-  --node-fill: var(--surface);
+  --seam: 0px;
+  --axis: 2px;
   position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--rule);
-  background: var(--surface);
-  animation: panel-in 0.2s ease-out;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  animation: panel-in 0.22s ease-out;
 }
 
 .panel::before {
@@ -190,10 +192,19 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: var(--seam);
+  left: 0;
   z-index: 0;
-  border-left: var(--tape-w) var(--lane-style) var(--lane);
+  border-left: 4px solid var(--c);
   pointer-events: none;
+}
+
+.panel[data-status="discarded"]::before {
+  border-left-style: dashed;
+  opacity: 0.62;
+}
+
+.panel.branch-linked {
+  box-shadow: inset 0 0 0 2px var(--c) !important;
 }
 
 @keyframes panel-in {
@@ -208,57 +219,50 @@
 }
 
 .panel-head {
-  padding: var(--space-3) var(--space-4) var(--space-4) var(--gutter);
-  border-bottom: 1px solid var(--rule);
+  padding: var(--space-2) var(--space-4) var(--space-3) var(--gutter);
+  border-bottom: 1px solid var(--neon);
+  background: var(--surface-2);
 }
 
 .panel-title {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-height: var(--hit);
 }
 
 .panel-title h2 {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-m);
+  color: var(--neon);
+  font-size: 15px;
 }
 
 .panel-title h2 .fork {
-  color: var(--lane);
+  color: var(--c);
 }
 
 .panel-close {
   margin-left: auto;
 }
 
-/* The anchored passage, quoted in the model's voice and taped in the lane colour. */
+/* The anchored passage, quoted with a rail and a faint tint in the branch colour. */
 .panel-quote {
   max-height: 8em;
-  margin: var(--space-3) 0 0;
-  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+  padding: 4px 10px;
   overflow-y: auto;
-  border-radius: var(--radius-tape);
-  background: var(--lane-tint);
-  font-family: var(--font-read);
-  font-size: var(--text-m);
+  border-left: 3px solid var(--c);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--c) 8%, transparent);
   font-style: italic;
-  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-[data-status="merged"] .panel-quote {
-  background: transparent;
-  padding-left: 0;
-  text-decoration: underline solid var(--lane) 2px;
-  text-underline-offset: 4px;
-}
-
 [data-status="discarded"] .panel-quote {
-  padding-left: 0;
-  color: var(--ink-soft);
+  color: var(--muted);
   text-decoration: line-through;
 }
 
@@ -276,18 +280,32 @@
   overflow-y: auto;
 }
 
+.panel[data-status="discarded"] .panel-scroll {
+  opacity: 0.62;
+}
+
+.panel .turn-assistant::before,
+.panel .turn-thinking::before {
+  background: var(--c);
+  border-color: var(--c);
+}
+
+.panel .turn-user::before {
+  border-color: var(--c);
+}
+
 .panel .thread-empty {
   padding: 0 0 0 var(--gutter);
 }
 
 .panel-foot {
   padding: var(--space-2) var(--space-4) var(--space-4) var(--gutter);
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--border);
 }
 
 .panel-closed-note {
   padding: var(--space-2) 0;
-  color: var(--ink-soft);
+  color: var(--muted);
 }
 
 /* Toasts */
@@ -308,16 +326,17 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--danger);
+  border: 1px solid color-mix(in srgb, var(--err) 35%, transparent);
   border-radius: var(--radius-s);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--err) 8%, var(--surface-2));
   box-shadow: var(--shadow-float);
   pointer-events: auto;
 }
 
 .toast p {
   flex: 1;
+  color: var(--err);
+  font: 600 13px var(--mono);
   min-width: 0;
   padding: 6px 0;
   overflow-wrap: anywhere;
@@ -365,12 +384,12 @@
     gap: var(--space-1) var(--space-2);
     padding: var(--space-2) var(--space-3);
     border-right: none;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--border);
   }
 
   .sidebar-top {
     display: flex;
-    flex: 1;
+    flex: 1 0 auto;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;

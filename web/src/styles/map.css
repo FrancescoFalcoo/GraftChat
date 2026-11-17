@@ -1,6 +1,6 @@
 /*
  * Conversation map (components/ConversationMap.tsx): main is a vertical trunk; every
- * branch leaves it in its lane colour, runs down its own column and, when merged, comes
+ * branch leaves it in its colour (var(--c)), runs down its own column and, when merged, comes
  * back into the trunk. Lines are SVG; nodes and labels are buttons placed on top.
  */
 
@@ -34,16 +34,21 @@
 }
 
 .map-trunk {
-  stroke: var(--trunk);
+  stroke: var(--border);
 }
 
 .map-edge {
-  stroke: var(--lane);
+  stroke: var(--c);
 }
 
 .map-edge[data-status="discarded"] {
   stroke-dasharray: 5 5;
-  opacity: 0.6;
+  opacity: 0.62;
+}
+
+.map-edge.branch-linked {
+  stroke-width: 4.5px;
+  box-shadow: none !important;
 }
 
 /* A node: a dot centred on its point, its label to the right. */
@@ -58,7 +63,7 @@
   border: 0;
   border-radius: var(--radius-s);
   background: none;
-  color: var(--ink);
+  color: var(--text);
   font: inherit;
   font-size: var(--text-s);
   text-align: left;
@@ -68,18 +73,19 @@
 }
 
 .map-node:hover .map-label {
-  background: var(--wash);
+  box-shadow: 0 0 0 1px var(--neon);
 }
 
 .map-node:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--neon);
   outline-offset: 1px;
 }
 
 .map-label {
   min-width: 0;
-  padding: 2px var(--space-1);
-  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--surface);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -90,13 +96,25 @@
   box-sizing: border-box;
   width: 18px;
   height: 18px;
-  border: 3px solid var(--ink);
+  border: 3px solid var(--neon);
   border-radius: 50%;
-  background: var(--surface);
+  background: var(--bg);
 }
 
-.map-node[data-lane] .map-dot {
-  border-color: var(--lane);
+.map-node[data-branch] .map-dot {
+  border-color: var(--c);
+}
+
+.map-node[data-branch] .map-label {
+  border-color: color-mix(in srgb, var(--c) 45%, transparent);
+}
+
+.map-node.branch-linked {
+  box-shadow: none !important;
+}
+
+.map-node.branch-linked .map-dot {
+  box-shadow: 0 0 0 2px var(--c);
 }
 
 .map-node-merge .map-dot {
@@ -107,7 +125,8 @@
 }
 
 .map-node-merge .map-label {
-  color: var(--ink-soft);
+  border-style: dashed;
+  color: var(--muted);
 }
 
 .map-node-empty .map-dot {
@@ -116,7 +135,11 @@
 
 .map-node-empty .map-label,
 .map-node[data-status="discarded"] .map-label {
-  color: var(--ink-soft);
+  color: var(--muted);
+}
+
+.map-node[data-status="discarded"] {
+  opacity: 0.62;
 }
 
 /* The anchored passage, written along the branch where it leaves the trunk. */
@@ -124,12 +147,11 @@
   position: absolute;
   max-width: 150px;
   padding: 1px var(--space-1);
-  border: 1px solid var(--lane);
-  border-radius: var(--radius-tape);
+  border: 1px solid var(--c);
+  border-radius: var(--radius-pill);
   background: var(--surface); /* opaque: lines may pass behind it */
-  color: var(--lane-ink);
+  color: var(--c);
   font: inherit;
-  font-family: var(--font-read);
   font-size: var(--text-s);
   font-style: italic;
   white-space: nowrap;
@@ -140,21 +162,21 @@
 }
 
 .map-branch-label:hover {
-  background: var(--wash);
+  background: color-mix(in srgb, var(--c) 14%, var(--surface));
 }
 
 .map-branch-label:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--neon);
   outline-offset: 1px;
 }
 
 .map-branch-label[data-status="discarded"] {
+  opacity: 0.62;
   text-decoration: line-through;
 }
 
 .map-status {
-  color: var(--ink-soft);
-  font-family: var(--font-ui);
+  color: var(--muted);
   font-style: normal;
 }
 
@@ -165,7 +187,7 @@
 
 @keyframes turn-flash {
   from {
-    box-shadow: 0 0 0 3px var(--ink);
+    box-shadow: 0 0 0 3px var(--text);
   }
   to {
     box-shadow: 0 0 0 3px transparent;
@@ -175,7 +197,7 @@
 @media (prefers-reduced-motion: reduce) {
   .turn-flash .user-text {
     animation: none;
-    outline: 3px solid var(--ink);
+    outline: 3px solid var(--text);
   }
 }
 

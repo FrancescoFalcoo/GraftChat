@@ -1,4 +1,4 @@
-import { plainQuote } from "../lanes";
+import { branchProps, POOL, plainQuote } from "../lanes";
 import type { Branch, ConversationState } from "../types";
 import { PointRow } from "./PointRow";
 
@@ -11,8 +11,8 @@ export interface TakeawayStatus {
 
 interface Props {
   branch: Branch;
-  /** Lane colour of the branch (lanes.ts). */
-  lane?: number;
+  /** Colour of the branch (lanes.ts). */
+  color?: string;
   decision: Decision;
   takeaway: TakeawayStatus | null;
   /** A take-away is being generated for some branch (they run one at a time). */
@@ -35,7 +35,7 @@ const CHOICES: { value: Decision; label: string }[] = [
 
 export function MergeBranchCard({
   branch,
-  lane = 0,
+  color = POOL[0],
   decision,
   takeaway,
   anyGenerating,
@@ -56,7 +56,7 @@ export function MergeBranchCard({
     <section
       className={`merge-card merge-card-${decision}`}
       aria-label={`Branch on: ${branch.anchor_quote}`}
-      data-lane={lane}
+      {...branchProps(color, branch.id)}
       data-decision={decision}
     >
       <blockquote className="merge-quote">{plainQuote(branch.anchor_quote)}</blockquote>

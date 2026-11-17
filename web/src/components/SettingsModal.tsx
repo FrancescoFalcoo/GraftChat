@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { api } from "../api";
 import type { Model, Settings, SettingsUpdate } from "../types";
+import { isSoundOn, playGlop, setSoundOn } from "../sound";
 import { Modal } from "./Modal";
 
 interface Props {
@@ -54,6 +55,7 @@ function ModelField({ label, value, onChange, models, disabled = false }: ModelF
 export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
   const [apiKey, setApiKey] = useState("");
   const [cap, setCap] = useState(String(settings.spend_cap_usd));
+  const [sound, setSound] = useState(isSoundOn());
   const [chatModel, setChatModel] = useState(settings.chat_model ?? "");
   const [sameAsChat, setSameAsChat] = useState(settings.takeaway_model === null);
   const [takeawayModel, setTakeawayModel] = useState(settings.takeaway_model ?? "");
@@ -162,6 +164,22 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
             onChange={(e) => setCap(e.target.value)}
           />
           <p className="field-note">Set it to 0 to use free models only.</p>
+        </div>
+
+        <div className="field">
+          <label className="check-label">
+            <input
+              type="checkbox"
+              checked={sound}
+              onChange={(e) => {
+                setSound(e.target.checked);
+                setSoundOn(e.target.checked);
+                if (e.target.checked) playGlop("merge");
+              }}
+            />
+            Play a sound when a branch is opened or merged
+          </label>
+          <p className="field-note">Saved in this browser only.</p>
         </div>
 
         <ModelField label="Chat model" value={chatModel} onChange={setChatModel} models={models} />

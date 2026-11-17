@@ -9,6 +9,7 @@ import {
   threadKey,
   threadMessages,
 } from "../util";
+import { playGlop } from "../sound";
 import { useToasts } from "./useToasts";
 
 /** A model call in flight on a thread. `text` is the optimistic user message, if any. */
@@ -253,6 +254,7 @@ export function useGraft() {
         if (activeRef.current !== conversationId) return false;
         applyState(res.state);
         setPanelBranchId(res.branch_id);
+        playGlop("branch");
         void refreshConversations();
         return true;
       } catch (e) {
