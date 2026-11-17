@@ -4,7 +4,8 @@
  * Main is a vertical trunk with one node per prompt and per merge. Every branch leaves
  * the trunk at the prompt whose answer it is anchored to, runs down its own column with
  * one node per prompt, and, if it was merged, comes back into the trunk at its merge
- * node. Pure layout: components/ConversationMap.tsx draws the result.
+ * node. Pure layout: components/MapCanvas.tsx draws the result, in the sidebar and full
+ * screen.
  */
 
 import { laneOf, plainQuote } from "./lanes";
@@ -16,10 +17,14 @@ const LABEL_WORDS = 5;
 /** Hard limit on a label, in characters. */
 const LABEL_CHARS = 30;
 
-/** Grid of the drawing, in pixels. */
-export const ROW_H = 48;
-export const COL_W = 180;
-export const PAD = 28;
+/** Grid of the drawing, in pixels (at zoom 1). Nodes are blocks centred on their point. */
+export const ROW_H = 96;
+export const COL_W = 248;
+export const PAD = 140;
+/** Size of a node's block, and the longest text it carries (CSS shows as many lines as fit). */
+export const NODE_W = 208;
+export const NODE_H = 60;
+const NODE_TEXT = 220;
 
 /** The first words of a prompt, on one line: "Explain grafting in three points…". */
 export function shortLabel(text: string): string {
@@ -69,8 +74,15 @@ export interface MapBranchLabel {
   lane: number;
   status: BranchStatus;
   quote: string;
+  /** Where the branch leaves the trunk: halfway along its first curve. */
   x: number;
   y: number;
+}
+
+/** The text of a node: the whole prompt on one line, cut only when very long. */
+function nodeText(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat ? truncate(flat, NODE_TEXT) : "(empty)";
 }
 
 export interface MapLayout {
@@ -128,7 +140,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
       id: b.id,
       lane: laneOf(state.branches, b.id),
       status: b.status,
-      quote: truncate(plainQuote(b.anchor_quote), 34),
+      quote: truncate(plainQuote(b.anchor_quote), 90),
       anchor,
       merge: b.merge_message_id === null ? null : (mergeIndex.get(b.merge_message_id) ?? null),
       prompts: b.messages
@@ -205,7 +217,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         kind: n.kind,
         x: x0,
         y: y(mainRow[i]),
-        label: n.kind === "merge" ? "Merge" : shortLabel(n.content),
+        label: n.kind === "merge" ? "Merge" : nodeText(n.content),
         full: n.kind === "merge" ? "Merge node" : n.content,
         messageId: n.messageId,
         branchId: null,
@@ -236,8 +248,9 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
       lane: p.lane,
       status: p.status,
       quote: p.quote,
-      x: xb,
-      y: ya + ROW_H * 0.5,
+      // the curve is a symmetric cubic: its middle is the middle of its ends
+      x: (x0 + xb) / 2,
+      y: (ya + y1) / 2,
     });
 
     if (p.prompts.length === 0) {
@@ -260,7 +273,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         kind: "prompt",
         x: xb,
         y: y(p.firstRow + i),
-        label: shortLabel(m.content),
+        label: nodeText(m.content),
         full: m.content,
         messageId: m.messageId,
         branchId: p.id,
@@ -271,7 +284,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
   }
 
   return {
-    width: PAD * 2 + (maxCol - minCol) * COL_W + COL_W,
+    width: PAD * 2 + (maxCol - minCol) * COL_W,
     height: PAD * 2 + lastRow * ROW_H,
     nodes,
     edges,

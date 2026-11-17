@@ -1,23 +1,32 @@
 /*
- * Conversation map (components/ConversationMap.tsx): main is a vertical trunk; every
- * branch leaves it in its lane colour, runs down its own column and, when merged, comes
- * back into the trunk. Lines are SVG; nodes and labels are buttons placed on top.
+ * Conversation map: the tree of one conversation, like a skill tree. Main is a trunk of
+ * blocks; every branch leaves it in its lane colour, runs down its own column and, when
+ * merged, comes back into the trunk at a merge knot. Drawn once (components/MapCanvas.tsx)
+ * and shown twice: as a live preview at the bottom of the sidebar, and full screen with
+ * pan, zoom and the logbook.
+ *
+ * One bold thing: "where you are" (the open branch, or the end of main) glows. Everything
+ * else stays quiet.
  */
 
-/* The map needs more room than the other dialogs. */
-.modal-wide:has(.map-scroll) {
-  width: min(1180px, 94vw);
-  max-width: none;
-}
+/* ---- canvas ------------------------------------------------------------------------ */
 
-.map-scroll {
-  max-height: min(70vh, 720px);
-  overflow: auto;
-}
-
-.map {
+.map-viewport {
   position: relative;
-  margin: 0 auto;
+  overflow: hidden;
+  background-color: var(--ground);
+  /* a dot grid: the drafting paper of the tree */
+  background-image: radial-gradient(circle, var(--rule) 1.1px, transparent 1.5px);
+  background-size: 22px 22px;
+  touch-action: none;
+}
+
+.map-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
 .map-edges {
@@ -26,139 +35,648 @@
   overflow: visible;
 }
 
-.map-trunk,
-.map-edge {
+.map-edges path {
   fill: none;
-  stroke-width: 2.5px;
   stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Each line has a soft halo under it, in its own colour. */
+.map-halo {
+  stroke: var(--lane, var(--trunk));
+  stroke-width: 12px;
+  opacity: 0.12;
 }
 
 .map-trunk {
   stroke: var(--trunk);
+  stroke-width: 3px;
 }
 
 .map-edge {
   stroke: var(--lane);
+  stroke-width: 2.5px;
 }
 
-.map-edge[data-status="discarded"] {
-  stroke-dasharray: 5 5;
-  opacity: 0.6;
+[data-lit] > .map-halo {
+  opacity: 0.32;
 }
 
-/* A node: a dot centred on its point, its label to the right. */
+[data-lit] > .map-trunk {
+  stroke: var(--ink-soft);
+}
+
+[data-status="discarded"] > .map-edge {
+  stroke-dasharray: 6 6;
+  opacity: 0.55;
+}
+
+[data-status="discarded"] > .map-halo {
+  opacity: 0;
+}
+
+/* ---- nodes: blocks centred on their point ---------------------------------------------- */
+
 .map-node {
   position: absolute;
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
   gap: var(--space-2);
-  max-width: 160px;
-  height: var(--hit);
-  padding: 0 var(--space-2) 0 0;
-  border: 0;
-  border-radius: var(--radius-s);
-  background: none;
+  min-height: 48px;
+  padding: 8px 10px 8px 9px;
+  border: 1px solid var(--edge);
+  border-left-width: 4px;
+  border-left-color: var(--ink);
+  border-radius: 6px;
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   font-size: var(--text-s);
+  line-height: 1.3;
   text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-  transform: translate(-9px, -50%);
+  transform: translate(-50%, -50%);
 }
 
-.map-node:hover .map-label {
+button.map-node {
+  cursor: pointer;
+}
+
+button.map-node:hover {
   background: var(--wash);
 }
 
-.map-node:focus-visible {
+button.map-node:focus-visible,
+button.map-branch-label:focus-visible {
   outline: 2px solid var(--ink);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
+.map-node[data-lane] {
+  border-left-color: var(--lane);
+}
+
+.map-glyph {
+  margin-top: 1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.map-node[data-lane] .map-glyph {
+  color: var(--lane-ink);
+}
+
+/* The text: two lines at normal zoom, more when close, none from far away. */
 .map-label {
-  min-width: 0;
-  padding: 2px var(--space-1);
-  border-radius: var(--radius-s);
-  background: var(--surface);
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 
-.map-dot {
-  flex: none;
-  box-sizing: border-box;
-  width: 18px;
-  height: 18px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--surface);
+[data-zoom="near"] .map-label {
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
 }
 
-.map-node[data-lane] .map-dot {
-  border-color: var(--lane);
+/* Under the pointer or the keyboard, a block shows its whole prompt, above its neighbours. */
+button.map-node:hover,
+button.map-node:focus-visible {
+  z-index: 3;
+  box-shadow: var(--shadow-float);
 }
 
-.map-node-merge .map-dot {
-  width: 22px;
-  height: 22px;
-  margin-left: -2px;
-  border-width: 4px;
+button.map-node:hover .map-label,
+button.map-node:focus-visible .map-label {
+  -webkit-line-clamp: unset;
+  line-clamp: none;
 }
 
-.map-node-merge .map-label {
-  color: var(--ink-soft);
+[data-zoom="far"] .map-label,
+[data-zoom="far"] .map-glyph {
+  visibility: hidden;
 }
 
-.map-node-empty .map-dot {
+/* A merge is a knot on the trunk, not a block of text. */
+.map-node-merge {
+  grid-template-columns: 16px auto;
+  align-items: center;
+  min-height: 0;
+  padding: 6px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--wash);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+[data-zoom="far"] .map-node-merge .map-label {
+  visibility: visible;
+}
+
+.map-node-empty {
   border-style: dashed;
-}
-
-.map-node-empty .map-label,
-.map-node[data-status="discarded"] .map-label {
+  border-left-style: dashed;
+  background: transparent;
   color: var(--ink-soft);
 }
 
-/* The anchored passage, written along the branch where it leaves the trunk. */
+.map-node[data-status="discarded"] {
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+
+.map-node[data-status="discarded"] .map-label {
+  text-decoration: line-through;
+}
+
+/* Where you are: the one thing that glows. */
+.map-node[data-current] {
+  border-color: var(--lane, var(--ink));
+  box-shadow:
+    0 0 0 3px var(--lane-tint-strong, color-mix(in srgb, var(--ink) 22%, transparent)),
+    0 0 28px 4px var(--lane-tint, color-mix(in srgb, var(--ink) 14%, transparent));
+}
+
+.map-node[data-current]::after {
+  content: "You are here";
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+[data-zoom="far"] .map-node[data-current]::after {
+  font-size: 22px;
+}
+
+/* A branch picked in the logbook. */
+.map-node[data-highlight],
+.map-branch-label[data-highlight] {
+  outline: 2px dashed var(--lane);
+  outline-offset: 3px;
+}
+
+/* ---- the anchored passage, on the curve where the branch leaves the trunk ------------ */
+
 .map-branch-label {
   position: absolute;
-  max-width: 150px;
-  padding: 1px var(--space-1);
+  display: flex;
+  flex-direction: column;
+  max-width: 200px;
+  padding: 3px 8px 4px;
   border: 1px solid var(--lane);
   border-radius: var(--radius-tape);
-  background: var(--surface); /* opaque: lines may pass behind it */
+  background: var(--surface); /* opaque: lines pass behind it */
   color: var(--lane-ink);
   font: inherit;
-  font-family: var(--font-read);
   font-size: var(--text-s);
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  text-align: left;
+  transform: translate(-50%, -50%);
+}
+
+button.map-branch-label {
   cursor: pointer;
-  transform: translate(14px, -50%);
 }
 
-.map-branch-label:hover {
-  background: var(--wash);
+button.map-branch-label:hover {
+  background: var(--lane-tint);
 }
 
-.map-branch-label:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-
-.map-branch-label[data-status="discarded"] {
-  text-decoration: line-through;
+.map-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-family: var(--font-read);
+  font-style: italic;
 }
 
 .map-status {
   color: var(--ink-soft);
-  font-family: var(--font-ui);
-  font-style: normal;
+  font-size: 11px;
 }
 
-/* The prompt reached from the map flashes once in the chat. */
+.map-branch-label[data-status="discarded"] .map-quote {
+  text-decoration: line-through;
+}
+
+[data-zoom="far"] .map-branch-label {
+  visibility: hidden;
+}
+
+/* ---- preview at the bottom of the sidebar ------------------------------------------- */
+
+/* Its text comes from data-text: a picture of the chat must not repeat the chat's text. */
+.map-viewport-mini [data-text]::before {
+  content: attr(data-text);
+}
+
+.map-dock {
+  padding: var(--space-3) var(--space-4) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.map-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.map-dock-name {
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.map-dock-view {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s);
+  background: none;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.map-dock-view:hover {
+  border-color: var(--edge);
+}
+
+.map-dock-view:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.map-viewport-mini {
+  height: clamp(150px, 28vh, 280px);
+  pointer-events: none; /* the whole box is the button */
+}
+
+/* Seen from far, the marker grows so it stays readable. */
+.map-viewport-mini .map-node[data-current]::after {
+  font-size: 26px;
+}
+
+.map-dock-empty {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-s);
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+/* ---- full screen ---------------------------------------------------------------------- */
+
+.map-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 90; /* under the toasts */
+  background: var(--ground);
+}
+
+.map-screen .map-viewport {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+/* The logbook takes the right side: the canvas (and "Fit") use what is left. */
+@media (min-width: 721px) {
+  .map-screen[data-log="open"] .map-viewport {
+    right: min(380px, 92vw);
+  }
+}
+
+.map-screen .map-viewport:active {
+  cursor: grabbing;
+}
+
+.map-screen .map-viewport:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -4px;
+}
+
+.map-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  color: var(--ink-soft);
+  transform: translate(-50%, -50%);
+}
+
+.map-head {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 1;
+  max-width: min(520px, 50vw);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+}
+
+.map-title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-l);
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.map-sub {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+/* Bottom left, where the sidebar's "Open map" was: the way out is where the way in was. */
+.map-controls {
+  position: absolute;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.map-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.map-zoom-value {
+  min-width: 4ch;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.map-log-toggle {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 2;
+}
+
+/* ---- logbook ---------------------------------------------------------------------------- */
+
+.map-log {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  width: min(380px, 92vw);
+  padding: var(--space-4) var(--space-5) var(--space-6);
+  border-left: 1px solid var(--rule);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  overflow-y: auto;
+}
+
+.map-log-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-l);
+}
+
+.log-section + .log-section {
+  margin-top: var(--space-5);
+}
+
+.log-section h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.log-start {
+  display: -webkit-box;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-read);
+  font-size: var(--text-m);
+  text-align: left;
+  cursor: pointer;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.log-start:hover {
+  text-decoration: underline;
+}
+
+.log-none {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+.log-merges,
+.log-points,
+.log-open {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log-merge + .log-merge {
+  margin-top: var(--space-4);
+}
+
+.log-merge-head {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.log-merge-head:hover {
+  text-decoration: underline;
+}
+
+/* Each branch hangs from its lane colour, like its tape in the chat. */
+.log-branch {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--lane);
+}
+
+.log-quote {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lane-ink);
+  font-family: var(--font-read);
+  font-size: var(--text-s);
+  font-style: italic;
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-quote:hover {
+  text-decoration: underline;
+}
+
+.log-points {
+  margin-top: var(--space-1);
+}
+
+.log-point-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit);
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-m);
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-point-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.log-chevron {
+  flex: none;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.log-point-head[aria-expanded="true"] .log-chevron {
+  transform: rotate(180deg);
+}
+
+.log-point-text {
+  margin: 0 0 var(--space-2);
+  color: var(--ink);
+  font-family: var(--font-read);
+  font-size: var(--text-m);
+  line-height: var(--lh-read);
+}
+
+.log-tag {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.log-points-left .log-point-title {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
+.log-left-toggle {
+  margin-top: var(--space-1);
+  font-size: var(--text-s);
+}
+
+.log-open li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  border-left: 3px solid var(--lane);
+}
+
+.log-open li + li {
+  margin-top: var(--space-2);
+}
+
+.log-meta {
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+.log-discarded .log-quote {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
+/* Narrow windows: the logbook covers the map, the controls stay reachable. */
+@media (max-width: 720px) {
+  .map-head {
+    left: var(--space-3);
+    max-width: 60vw;
+  }
+
+  .map-dock-view {
+    display: none;
+  }
+
+  .map-dock {
+    padding: 0;
+    border-top: none;
+  }
+
+  .map-dock-head {
+    margin: 0;
+  }
+
+  .map-dock-name,
+  .map-dock-empty {
+    display: none;
+  }
+}
+
+/* ---- the prompt reached from the map flashes once in the chat ------------------------ */
+
 .turn-flash .user-text {
   animation: turn-flash 1.6s ease-out;
 }
@@ -176,13 +694,6 @@
   .turn-flash .user-text {
     animation: none;
     outline: 3px solid var(--ink);
-  }
-}
-
-/* Two stacked buttons at the bottom of the sidebar: map, then settings. */
-@media (min-width: 721px) {
-  .sidebar-bottom .btn-block + .btn-block {
-    margin-top: var(--space-2);
   }
 }
 
