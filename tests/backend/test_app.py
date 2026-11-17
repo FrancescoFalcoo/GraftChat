@@ -88,6 +88,7 @@ def test_settings_never_return_the_key(client):
         "has_api_key": True,
         "api_key_hint": "…0001",
         "api_key_from_env": False,
+        "key_info": None,
         "spend_cap_usd": 0.0,
         "chat_model": TEST_MODEL,
         "takeaway_model": None,

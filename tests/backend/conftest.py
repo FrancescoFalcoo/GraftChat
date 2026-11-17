@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from api.config import Config
-from api.provider import ChatMessage, Completion, ModelInfo, ProviderError
+from api.provider import ChatMessage, Completion, KeyInfo, ModelInfo, ProviderError
 from api.service import Service
 from api.settings import ENV_KEY, SettingsStore
 
@@ -90,6 +90,8 @@ def service(config, provider) -> Service:
         provider_factory=factory,
         models_fetcher=lambda: models,
         clock=Clock(),
+        key_checker=lambda key: KeyInfo(None, True, 50, 50),
+        oauth_exchanger=lambda code, verifier: f"sk-or-v1-from-oauth-{code}",
     )
     service.settings.update(api_key=TEST_KEY, chat_model=TEST_MODEL)
     return service

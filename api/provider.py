@@ -225,6 +225,80 @@ class OpenRouterProvider:
         return ProviderError("error", message)
 
 
+@dataclass(frozen=True)
+class KeyInfo:
+    """What OpenRouter says about a key (``GET /api/v1/key``)."""
+
+    label: str | None
+    is_free_tier: bool  # the account never bought credits
+    free_daily_limit: int | None  # requests per day to ":free" models
+    free_daily_remaining: int | None
+
+
+def _int_or_none(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def check_key(api_key: str, client: httpx.Client | None = None) -> KeyInfo:
+    """Ask OpenRouter whether ``api_key`` works, and what it allows.
+
+    Raises:
+        ProviderError: ``auth`` if the key is rejected, ``error`` if OpenRouter
+            cannot be reached or answers something unexpected.
+    """
+    client = client or httpx.Client(timeout=httpx.Timeout(15.0, connect=10.0))
+    try:
+        response = client.get(f"{OPENROUTER_URL}/key", headers={"Authorization": f"Bearer {api_key}"})
+    except httpx.HTTPError as exc:
+        raise ProviderError("error", f"Could not reach OpenRouter to check the key: {exc}") from exc
+    try:
+        body = response.json()
+    except (json.JSONDecodeError, ValueError):
+        body = None
+    if response.status_code in (401, 403):
+        raise ProviderError("auth", _error_message(body, "OpenRouter rejected this key."))
+    if response.status_code != 200 or not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ProviderError("error", _error_message(body, f"OpenRouter answered with HTTP {response.status_code}."))
+    data = body["data"]
+    daily = data.get("free_model_daily_requests")
+    daily = daily if isinstance(daily, dict) else {}
+    label = data.get("label")
+    return KeyInfo(
+        label=label if isinstance(label, str) else None,
+        is_free_tier=bool(data.get("is_free_tier")),
+        free_daily_limit=_int_or_none(daily.get("limit")),
+        free_daily_remaining=_int_or_none(daily.get("remaining")),
+    )
+
+
+OAUTH_URL = "https://openrouter.ai/auth"
+
+
+def exchange_oauth_code(code: str, code_verifier: str, client: httpx.Client | None = None) -> str:
+    """Turn the code of OpenRouter's OAuth PKCE flow into the user's API key.
+
+    Raises:
+        ProviderError: if the exchange fails (expired or used code, network).
+    """
+    client = client or httpx.Client(timeout=httpx.Timeout(20.0, connect=10.0))
+    try:
+        response = client.post(
+            f"{OPENROUTER_URL}/auth/keys",
+            json={"code": code, "code_verifier": code_verifier, "code_challenge_method": "S256"},
+        )
+    except httpx.HTTPError as exc:
+        raise ProviderError("error", f"Could not reach OpenRouter: {exc}") from exc
+    try:
+        body = response.json()
+    except (json.JSONDecodeError, ValueError):
+        body = None
+    key = body.get("key") if isinstance(body, dict) else None
+    if response.status_code != 200 or not isinstance(key, str) or not key:
+        message = _error_message(body, f"OpenRouter answered with HTTP {response.status_code}.")
+        raise ProviderError("auth", f"OpenRouter did not give a key: {message}")
+    return key
+
+
 def _is_free(model: dict) -> bool:
     pricing = model.get("pricing")
     if not isinstance(pricing, dict):

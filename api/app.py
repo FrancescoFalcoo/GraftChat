@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -169,6 +169,22 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
     @app.delete("/api/settings/api-key")
     def delete_api_key() -> dict:
         return service.delete_api_key()
+
+    @app.post("/api/oauth/start")
+    def oauth_start(request: Request) -> dict:
+        # The browser comes back to this same server (in development, through the Vite proxy).
+        return service.oauth_start(str(request.url_for("oauth_callback")))
+
+    @app.get("/api/oauth/callback", name="oauth_callback")
+    def oauth_callback(code: str = "", state: str = "") -> RedirectResponse:
+        # A page the browser lands on, so errors come back as a query string, not JSON.
+        try:
+            if not code:
+                raise ApiError(422, "validation", "OpenRouter did not send a code back.")
+            service.oauth_finish(code, state)
+        except ApiError as error:
+            return RedirectResponse(f"/?openrouter=error&message={quote(error.message)}", status_code=303)
+        return RedirectResponse("/?openrouter=connected", status_code=303)
 
     @app.get("/api/models")
     def models() -> dict:

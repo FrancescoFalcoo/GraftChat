@@ -11,8 +11,11 @@ at call time with ``NotImplementedError`` (reported as HTTP 501 by ``api.app``).
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import math
+import secrets
 import sqlite3
 import threading
 import time
@@ -21,17 +24,23 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import httpx
+
 from api import db, documents, takeaway
 from api.config import Config
 from api.provider import (
     ChatMessage,
     ImagePart,
     Completion,
+    OAUTH_URL,
     FakeProvider,
+    KeyInfo,
     ModelInfo,
     OpenRouterProvider,
     Provider,
     ProviderError,
+    check_key,
+    exchange_oauth_code,
     fetch_free_models,
     message_payload,
 )
@@ -42,6 +51,7 @@ from core.models import Branch, BranchStatus, CallPurpose, Message, PointOrigin,
 DEFAULT_TITLE = "New chat"
 TITLE_LENGTH = 60
 MODELS_CACHE_S = 600
+OAUTH_TTL_S = 600  # OpenRouter's codes expire after 10 minutes
 
 # Files on a user message (docs/API.md, "Chat"): images, sent as images, and documents,
 # sent as their extracted text (api/documents.py). Images are recognised by their first
@@ -221,6 +231,8 @@ class Service:
         provider_factory: Callable[[str], Provider] | None = None,
         models_fetcher: Callable[[], list[ModelInfo]] = fetch_free_models,
         clock: Callable[[], datetime] | None = None,
+        key_checker: Callable[[str], KeyInfo] = check_key,
+        oauth_exchanger: Callable[[str, str], str] = exchange_oauth_code,
     ) -> None:
         self.config = config
         self.settings = settings or SettingsStore(config.settings_path)
@@ -230,6 +242,10 @@ class Service:
         self._busy: set[tuple] = set()
         self._busy_lock = threading.Lock()
         self._models: tuple[float, list[ModelInfo]] | None = None
+        self._key_checker = key_checker
+        self._oauth_exchanger = oauth_exchanger
+        self._key_info: tuple[str, KeyInfo] | None = None  # the last check, for the key it checked
+        self._oauth: dict[str, tuple[str, float]] = {}  # state -> (code_verifier, started at)
         db.connect(config.db_path).close()  # create and migrate the database up front
 
     def _default_provider(self, api_key: str) -> Provider:
@@ -816,10 +832,19 @@ class Service:
         api_key, from_env = effective_api_key(settings)
         with self._connect() as conn:
             spent = db.month_spend(conn, self._now())
+        info = self._key_info[1] if self._key_info and self._key_info[0] == api_key else None
         return {
             "has_api_key": bool(api_key),
             "api_key_hint": key_hint(api_key),
             "api_key_from_env": from_env,
+            "key_info": None
+            if info is None
+            else {
+                "label": info.label,
+                "is_free_tier": info.is_free_tier,
+                "free_daily_limit": info.free_daily_limit,
+                "free_daily_remaining": info.free_daily_remaining,
+            },
             "spend_cap_usd": settings.spend_cap_usd,
             "chat_model": settings.chat_model,
             "takeaway_model": settings.takeaway_model,
@@ -834,6 +859,7 @@ class Service:
             api_key = (changes["api_key"] or "").strip()
             if not api_key:
                 raise invalid("The API key is empty. Use 'Remove' to delete the saved key.")
+            self._check_key(api_key)
             clean["api_key"] = api_key
         if "spend_cap_usd" in changes:
             cap = changes["spend_cap_usd"]
@@ -846,6 +872,54 @@ class Service:
         if clean:
             self.settings.update(**clean)
         return self.settings_view()
+
+    def _check_key(self, api_key: str) -> None:
+        """Refuse a key OpenRouter rejects; remember what it says about a good one.
+
+        If OpenRouter cannot be reached the key is saved anyway: working offline
+        with the fake model, or a network hiccup, must not block the setup.
+        """
+        if self.config.fake_llm:
+            return
+        try:
+            self._key_info = (api_key, self._key_checker(api_key))
+        except ProviderError as error:
+            if error.kind == "auth":
+                raise invalid(
+                    "OpenRouter rejected this key. Copy it again from openrouter.ai/keys "
+                    "(it starts with sk-or-)."
+                ) from error
+
+    # --- OpenRouter OAuth (PKCE): get a key by logging in, without copying it ------
+
+    def oauth_start(self, callback_url: str) -> dict:
+        """The URL that sends the user to OpenRouter to approve a key for this app."""
+        now = time.monotonic()
+        self._oauth = {s: v for s, v in self._oauth.items() if now - v[1] < OAUTH_TTL_S}
+        verifier = secrets.token_urlsafe(48)
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+        state = secrets.token_urlsafe(16)
+        self._oauth[state] = (verifier, now)
+        query = httpx.QueryParams(
+            {
+                "callback_url": f"{callback_url}?state={state}",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+            }
+        )
+        return {"url": f"{OAUTH_URL}?{query}"}
+
+    def oauth_finish(self, code: str, state: str) -> None:
+        """Exchange the code OpenRouter sent back for a key, check it and save it."""
+        pending = self._oauth.pop(state, None)
+        if pending is None or time.monotonic() - pending[1] > OAUTH_TTL_S:
+            raise invalid("This OpenRouter login is unknown or expired. Start it again from Settings.")
+        try:
+            api_key = self._oauth_exchanger(code, pending[0])
+        except ProviderError as error:
+            raise ApiError(502, "provider_auth", error.message) from error
+        self._check_key(api_key)
+        self.settings.update(api_key=api_key)
 
     def delete_api_key(self) -> dict:
         self.settings.update(api_key=None)
