@@ -294,26 +294,75 @@
   border-bottom-right-radius: var(--stub-r);
 }
 
-.quote-link {
-  display: block;
+/* A merged branch, folded: its passage underlined in its colour and what it brought back. */
+.merge-node-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-2);
+  align-items: center;
+  width: fit-content; /* the chevron stays next to the passage, not at the far edge */
   max-width: 100%;
   min-height: var(--hit);
   padding: 0;
   border: none;
   background: none;
   color: var(--ink);
-  font-family: var(--font-read);
-  font-size: var(--text-m);
-  font-style: italic;
+  font: inherit;
   text-align: left;
-  text-decoration: underline solid var(--lane) 2px;
-  text-underline-offset: 4px;
-  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
-.quote-link:hover {
+.merge-node-quote {
+  font-family: var(--font-read);
+  font-size: var(--text-m);
+  font-style: italic;
+  text-decoration: underline solid var(--lane) 2px;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+
+.merge-node-meta {
+  grid-column: 1;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+.merge-node-chevron {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s ease;
+}
+
+.merge-node-head:hover .merge-node-quote {
   color: var(--lane-ink);
+}
+
+.merge-node-head:hover .merge-node-chevron {
+  stroke: var(--ink);
+}
+
+.merge-node-head:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+.merge-node-head[aria-expanded="true"] .merge-node-chevron {
+  transform: rotate(180deg);
+}
+
+.merge-node-body {
+  margin-top: var(--space-2);
+}
+
+.merge-node-open {
+  margin-top: var(--space-1);
+  font-size: var(--text-s);
 }
 
 .merge-node-none {

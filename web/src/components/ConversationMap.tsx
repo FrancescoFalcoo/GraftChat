@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { layoutConversationMap, type MapNode } from "../conversationMap";
 import { usePanZoom } from "../hooks/usePanZoom";
-import { buildLogbook } from "../logbook";
+import { buildLogbook, logbookSummary } from "../logbook";
 import type { ConversationState } from "../types";
+import { readFlag, writeFlag } from "../util";
 import { Logbook } from "./Logbook";
 import { currentNodeKey, MapCanvas } from "./MapCanvas";
 import { NodeDetails } from "./NodeDetails";
@@ -19,6 +20,7 @@ interface Props {
 }
 
 const STEP = 1.25;
+const LOGBOOK_KEY = "graftchat.logbookOpen";
 
 /**
  * The whole tree of the current conversation, full screen. On the left: what it is and the
@@ -34,6 +36,11 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
   const [highlight, setHighlight] = useState<number | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const backRef = useRef<HTMLButtonElement>(null);
+  const [logShown, setLogShown] = useState(() => readFlag(LOGBOOK_KEY, true));
+  const showLog = (on: boolean): void => {
+    writeFlag(LOGBOOK_KEY, on);
+    setLogShown(on);
+  };
   const selected = layout.nodes.find((n) => n.key === selectedKey) ?? null;
 
   const showCurrent = (): void => {
@@ -59,6 +66,18 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
   useEffect(() => {
     backRef.current?.focus();
   }, []);
+
+  // Folding or unfolding the logbook changes the width of the tree's box: keep in the middle
+  // what was in the middle, so the tree does not slide under the title card.
+  const lastWidth = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    if (lastWidth.current !== null && lastWidth.current !== el.clientWidth) {
+      panBy((el.clientWidth - lastWidth.current) / 2, 0);
+    }
+    lastWidth.current = el.clientWidth;
+  }, [logShown, panBy, viewportRef]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     if (e.key === "Escape") {
@@ -94,7 +113,14 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
   };
 
   return (
-    <div className="map-screen" role="dialog" aria-modal="true" aria-label="Conversation map" onKeyDown={onKeyDown}>
+    <div
+      className="map-screen"
+      data-logbook={logShown ? "open" : "folded"}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Conversation map"
+      onKeyDown={onKeyDown}
+    >
       <aside className="map-side" aria-label="About this map">
         <button ref={backRef} type="button" className="btn btn-small map-back" onClick={onClose}>
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
@@ -111,18 +137,31 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
           </p>
         </header>
 
-        <div className="map-side-scroll">
-          <Logbook
-            logbook={logbook}
-            onShowBranch={showBranch}
-            onOpenBranch={onOpenBranch}
-            onJump={(id) => onJump(id, null)}
-          />
-        </div>
+        {logShown ? (
+          <>
+            <div className="map-side-scroll">
+              <Logbook
+                logbook={logbook}
+                onShowBranch={showBranch}
+                onOpenBranch={onOpenBranch}
+                onJump={(id) => onJump(id, null)}
+                onFold={() => showLog(false)}
+              />
+            </div>
 
-        <button type="button" className="btn map-close" onClick={onClose}>
-          Close map
-        </button>
+            <button type="button" className="btn map-close" onClick={onClose}>
+              Close map
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn map-log-open" aria-expanded="false" onClick={() => showLog(true)}>
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Logbook
+            <span className="map-log-meta">{logbookSummary(logbook)}</span>
+          </button>
+        )}
       </aside>
 
       <div

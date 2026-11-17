@@ -68,3 +68,11 @@ export function buildLogbook(state: ConversationState): Logbook {
     discarded: state.branches.filter((b) => b.status === "discarded").map((b) => entry(state, b.id)),
   };
 }
+
+/** The logbook in one line, for when it is folded: "2 merges, 11 points". */
+export function logbookSummary(log: Logbook): string {
+  if (log.merges.length === 0) return "nothing merged yet";
+  const kept = log.merges.reduce((n, m) => n + m.branches.reduce((k, b) => k + b.kept.length, 0), 0);
+  const merges = `${log.merges.length} merge${log.merges.length === 1 ? "" : "s"}`;
+  return `${merges}, ${kept} point${kept === 1 ? "" : "s"}`;
+}

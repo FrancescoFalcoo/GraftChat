@@ -287,6 +287,7 @@ describe("ConversationMap full screen", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Logbook/ }));
     expect(screen.queryByText("Merge 1")).toBeNull();
     expect(screen.getByRole("button", { name: /^Logbook/ }).textContent).toMatch(/1 merge, 0 points/);
+    expect(screen.getByRole("dialog").getAttribute("data-logbook")).toBe("folded");
     cleanup();
     view();
     expect(screen.queryByText("Merge 1")).toBeNull();
