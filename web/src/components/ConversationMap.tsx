@@ -1,126 +1,90 @@
-import { buildConversationMap, type MapBranch, type MapPrompt } from "../conversationMap";
-import type { ConversationState } from "../types";
-import { ForkIcon } from "./Marks";
+import { layoutConversationMap, type MapNode } from "../conversationMap";
+import type { BranchStatus, ConversationState } from "../types";
 import { Modal } from "./Modal";
 
 interface Props {
   state: ConversationState;
-  /** Go to a prompt: `branchId` null = a prompt on main. */
+  /** Go to a message: `branchId` null = a message on main. */
   onJump: (messageId: number, branchId: number | null) => void;
   /** Open a branch in the side panel. */
   onOpenBranch: (branchId: number) => void;
   onClose: () => void;
 }
 
-const STATUS_WORD: Record<MapBranch["status"], string> = {
-  open: "Open",
-  merged: "Merged",
-  discarded: "Discarded",
+const STATUS_WORD: Record<BranchStatus, string> = {
+  open: "open",
+  merged: "merged",
+  discarded: "discarded",
 };
 
-function PromptNode({
-  prompt,
-  branchId,
-  onJump,
-}: {
-  prompt: MapPrompt;
-  branchId: number | null;
-  onJump: Props["onJump"];
-}) {
+function Node({ node, onJump, onOpenBranch }: { node: MapNode } & Omit<Props, "state" | "onClose">) {
+  const click = (): void => {
+    if (node.messageId !== null) onJump(node.messageId, node.branchId);
+    else if (node.branchId !== null) onOpenBranch(node.branchId);
+  };
   return (
     <button
       type="button"
-      className="map-node"
-      title={prompt.full}
-      aria-label={`Go to: ${prompt.full}`}
-      onClick={() => onJump(prompt.messageId, branchId)}
+      className={`map-node map-node-${node.kind}`}
+      style={{ left: node.x, top: node.y }}
+      data-lane={node.lane ?? undefined}
+      data-status={node.status ?? undefined}
+      title={node.full}
+      aria-label={node.kind === "merge" ? "Go to this merge" : `Go to: ${node.full}`}
+      onClick={click}
     >
       <span className="map-dot" aria-hidden="true" />
-      <span className="map-label">{prompt.label}</span>
+      <span className="map-label">{node.label}</span>
     </button>
   );
 }
 
-function BranchGroup({
-  branch,
-  onJump,
-  onOpenBranch,
-}: {
-  branch: MapBranch;
-  onJump: Props["onJump"];
-  onOpenBranch: Props["onOpenBranch"];
-}) {
-  return (
-    <li className="map-branch" data-lane={branch.lane} data-status={branch.status}>
-      <button
-        type="button"
-        className="map-branch-head"
-        aria-label={`Open the branch on «${branch.quote}» (${STATUS_WORD[branch.status]})`}
-        onClick={() => onOpenBranch(branch.id)}
-      >
-        <ForkIcon />
-        <span className="map-quote">«{branch.quote}»</span>
-        <span className="map-status">{STATUS_WORD[branch.status]}</span>
-      </button>
-      {branch.prompts.length > 0 ? (
-        <ul className="map-lane">
-          {branch.prompts.map((p) => (
-            <li key={p.messageId}>
-              <PromptNode prompt={p} branchId={branch.id} onJump={onJump} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="map-empty-branch">No messages yet</p>
-      )}
-    </li>
-  );
-}
-
-/** The whole tree of the current conversation, as a dialog. */
+/** The whole tree of the current conversation, drawn as a graph, in a dialog. */
 export function ConversationMap({ state, onJump, onOpenBranch, onClose }: Props) {
-  const rows = buildConversationMap(state);
+  const layout = layoutConversationMap(state);
 
   return (
     <Modal title="Conversation map" onClose={onClose} wide>
-      {rows.length === 0 ? (
+      {layout.nodes.length === 0 ? (
         <p className="muted">Nothing here yet. Ask something first.</p>
       ) : (
-        <ol className="map" aria-label={`Map of ${state.conversation.title}`}>
-          {rows.map((row) =>
-            row.kind === "prompt" ? (
-              <li key={row.prompt.messageId} className="map-row">
-                <PromptNode prompt={row.prompt} branchId={null} onJump={onJump} />
-                {row.branches.length > 0 && (
-                  <ul className="map-branches">
-                    {row.branches.map((b) => (
-                      <BranchGroup key={b.id} branch={b} onJump={onJump} onOpenBranch={onOpenBranch} />
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ) : (
-              <li key={row.messageId} className="map-row map-merge">
-                <button
-                  type="button"
-                  className="map-node"
-                  aria-label="Go to this merge"
-                  onClick={() => onJump(row.messageId, null)}
-                >
-                  <span className="map-ring" aria-hidden="true" />
-                  <span className="map-label">
-                    Merged{" "}
-                    {row.merged.map((b, i) => (
-                      <span key={b.id} className="map-merged" data-lane={b.lane}>
-                        {i > 0 ? ", " : ""}«{b.quote}»
-                      </span>
-                    ))}
-                  </span>
-                </button>
-              </li>
-            ),
-          )}
-        </ol>
+        <div className="map-scroll">
+          <div
+            className="map"
+            role="group"
+            aria-label={`Map of ${state.conversation.title}`}
+            style={{ width: layout.width, height: layout.height }}
+          >
+            <svg className="map-edges" width={layout.width} height={layout.height} aria-hidden="true">
+              {layout.edges.map((e) => (
+                <path
+                  key={e.key}
+                  d={e.d}
+                  className={e.lane === null ? "map-trunk" : "map-edge"}
+                  data-lane={e.lane ?? undefined}
+                  data-status={e.status ?? undefined}
+                />
+              ))}
+            </svg>
+            {layout.branchLabels.map((b) => (
+              <button
+                key={`label-${b.branchId}`}
+                type="button"
+                className="map-branch-label"
+                style={{ left: b.x, top: b.y }}
+                data-lane={b.lane}
+                data-status={b.status}
+                aria-label={`Open the branch on «${b.quote}» (${STATUS_WORD[b.status]})`}
+                onClick={() => onOpenBranch(b.branchId)}
+              >
+                «{b.quote}» <span className="map-status">{STATUS_WORD[b.status]}</span>
+              </button>
+            ))}
+            {layout.nodes.map((n) => (
+              <Node key={n.key} node={n} onJump={onJump} onOpenBranch={onOpenBranch} />
+            ))}
+          </div>
+        </div>
       )}
     </Modal>
   );

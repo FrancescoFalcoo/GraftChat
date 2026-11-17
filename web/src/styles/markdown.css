@@ -230,3 +230,34 @@
   background-color: var(--lane-5-tint-strong);
   text-decoration: underline solid var(--lane-5) 2px;
 }
+
+/* An anchored passage under the pointer (useAnchorClicks.ts): it opens its branch on click. */
+::highlight(graft-l0-hover) {
+  background-color: var(--lane-0-tint-strong);
+  text-decoration: underline solid var(--lane-0) 3px;
+}
+
+::highlight(graft-l1-hover) {
+  background-color: var(--lane-1-tint-strong);
+  text-decoration: underline solid var(--lane-1) 3px;
+}
+
+::highlight(graft-l2-hover) {
+  background-color: var(--lane-2-tint-strong);
+  text-decoration: underline solid var(--lane-2) 3px;
+}
+
+::highlight(graft-l3-hover) {
+  background-color: var(--lane-3-tint-strong);
+  text-decoration: underline solid var(--lane-3) 3px;
+}
+
+::highlight(graft-l4-hover) {
+  background-color: var(--lane-4-tint-strong);
+  text-decoration: underline solid var(--lane-4) 3px;
+}
+
+::highlight(graft-l5-hover) {
+  background-color: var(--lane-5-tint-strong);
+  text-decoration: underline solid var(--lane-5) 3px;
+}

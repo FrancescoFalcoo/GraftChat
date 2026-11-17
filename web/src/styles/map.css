@@ -1,54 +1,73 @@
 /*
- * Conversation map (components/ConversationMap.tsx): the trunk of main with one node per
- * prompt, branches hanging from it in their lane colour, merges as rings.
+ * Conversation map (components/ConversationMap.tsx): main is a vertical trunk; every
+ * branch leaves it in its lane colour, runs down its own column and, when merged, comes
+ * back into the trunk. Lines are SVG; nodes and labels are buttons placed on top.
  */
 
-.map,
-.map ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* The map needs more room than the other dialogs. */
+.modal-wide:has(.map-scroll) {
+  width: min(1180px, 94vw);
+  max-width: none;
+}
+
+.map-scroll {
+  max-height: min(70vh, 720px);
+  overflow: auto;
 }
 
 .map {
   position: relative;
-  padding-left: var(--space-1);
+  margin: 0 auto;
 }
 
-/* The trunk: one line behind every row of main. */
-.map::before {
-  content: "";
+.map-edges {
   position: absolute;
-  top: 14px;
-  bottom: 14px;
-  left: calc(var(--space-1) + 11px);
-  width: var(--trunk-w);
-  background: var(--trunk);
+  inset: 0;
+  overflow: visible;
 }
 
-.map-row {
-  position: relative;
+.map-trunk,
+.map-edge {
+  fill: none;
+  stroke-width: 2.5px;
+  stroke-linecap: round;
 }
 
+.map-trunk {
+  stroke: var(--trunk);
+}
+
+.map-edge {
+  stroke: var(--lane);
+}
+
+.map-edge[data-status="discarded"] {
+  stroke-dasharray: 5 5;
+  opacity: 0.6;
+}
+
+/* A node: a dot centred on its point, its label to the right. */
 .map-node {
-  position: relative;
+  position: absolute;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--hit);
-  padding: var(--space-1) var(--space-2);
+  gap: var(--space-2);
+  max-width: 160px;
+  height: var(--hit);
+  padding: 0 var(--space-2) 0 0;
   border: 0;
   border-radius: var(--radius-s);
   background: none;
   color: var(--ink);
   font: inherit;
-  font-size: var(--text-m);
+  font-size: var(--text-s);
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
+  transform: translate(-9px, -50%);
 }
 
-.map-node:hover {
+.map-node:hover .map-label {
   background: var(--wash);
 }
 
@@ -59,135 +78,84 @@
 
 .map-label {
   min-width: 0;
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-s);
+  background: var(--surface);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* A prompt: a hollow ring on its line, like the user's turns in the chat. */
 .map-dot {
   flex: none;
-  z-index: 1;
-  width: 10px;
-  height: 10px;
-  margin-left: 1px;
-  border: 2px solid var(--node-line, var(--ink));
-  border-radius: 50%;
-  background: var(--ground);
-}
-
-/* A merge: the larger ring of the chat's merge nodes. */
-.map-ring {
-  flex: none;
-  z-index: 1;
-  width: 14px;
-  height: 14px;
-  margin-left: -1px;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
   border: 3px solid var(--ink);
   border-radius: 50%;
-  background: var(--ground);
+  background: var(--surface);
 }
 
-.map-merge .map-label {
+.map-node[data-lane] .map-dot {
+  border-color: var(--lane);
+}
+
+.map-node-merge .map-dot {
+  width: 22px;
+  height: 22px;
+  margin-left: -2px;
+  border-width: 4px;
+}
+
+.map-node-merge .map-label {
   color: var(--ink-soft);
 }
 
-.map-merged {
-  color: var(--lane-ink);
+.map-node-empty .map-dot {
+  border-style: dashed;
 }
 
-/* Branches hang to the right of the trunk, each on a line of its lane colour. */
-.map .map-branches {
-  margin: 0 0 var(--space-2) 34px;
+.map-node-empty .map-label,
+.map-node[data-status="discarded"] .map-label {
+  color: var(--ink-soft);
 }
 
-.map-branch {
-  position: relative;
-  padding-left: var(--space-4);
-}
-
-/* The stub leaving the trunk, then the lane going down. */
-.map-branch::before {
-  content: "";
+/* The anchored passage, written along the branch where it leaves the trunk. */
+.map-branch-label {
   position: absolute;
-  top: 0;
-  left: -19px; /* starts on the trunk */
-  width: 27px;
-  height: 16px;
-  border-left: var(--trunk-w) solid var(--lane);
-  border-bottom: var(--trunk-w) solid var(--lane);
-  border-bottom-left-radius: 10px;
-}
-
-.map-branch::after {
-  content: "";
-  position: absolute;
-  top: 16px;
-  bottom: 12px;
-  left: calc(var(--space-4) + 12px);
-  width: var(--trunk-w);
-  background: var(--lane);
-}
-
-.map-branch[data-status="discarded"]::before {
-  border-left-style: dashed;
-  border-bottom-style: dashed;
-}
-
-.map-branch[data-status="discarded"]::after {
-  background: none;
-  border-left: var(--trunk-w) dashed var(--lane);
-}
-
-.map-branch-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--hit);
-  padding: var(--space-1) var(--space-2);
-  border: 0;
+  max-width: 150px;
+  padding: 1px var(--space-1);
+  border: 1px solid var(--lane);
   border-radius: var(--radius-tape);
-  background: var(--lane-tint);
-  color: var(--ink);
+  background: var(--surface); /* opaque: lines may pass behind it */
+  color: var(--lane-ink);
   font: inherit;
+  font-family: var(--font-read);
   font-size: var(--text-s);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
+  transform: translate(14px, -50%);
 }
 
-.map-branch-head:hover {
-  background: var(--lane-tint-strong);
+.map-branch-label:hover {
+  background: var(--wash);
 }
 
-.map-branch-head:focus-visible {
+.map-branch-label:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
 
-.map-branch-head svg {
-  color: var(--lane);
-}
-
-.map-quote {
-  font-family: var(--font-read);
-  font-style: italic;
+.map-branch-label[data-status="discarded"] {
+  text-decoration: line-through;
 }
 
 .map-status {
   color: var(--ink-soft);
-}
-
-.map-branch[data-status="discarded"] .map-quote {
-  text-decoration: line-through;
-}
-
-.map-lane .map-node {
-  --node-line: var(--lane);
-}
-
-.map-empty-branch {
-  margin: 0 0 var(--space-2) calc(var(--space-5) + 4px);
-  color: var(--ink-soft);
-  font-size: var(--text-s);
+  font-family: var(--font-ui);
+  font-style: normal;
 }
 
 /* The prompt reached from the map flashes once in the chat. */
@@ -216,4 +184,9 @@
   .sidebar-bottom .btn-block + .btn-block {
     margin-top: var(--space-2);
   }
+}
+
+/* An anchored passage under the pointer: clickable, opens its branch. */
+.md.anchor-hover {
+  cursor: pointer;
 }

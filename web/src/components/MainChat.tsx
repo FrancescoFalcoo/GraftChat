@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useAnchorClicks } from "../hooks/useAnchorClicks";
 import { useAnchorHighlights } from "../hooks/useAnchorHighlights";
 import { laneOf } from "../lanes";
 import type { PendingRequest } from "../hooks/useGraft";
@@ -67,6 +68,7 @@ export function MainChat({
   );
 
   useAnchorHighlights(scopeRef, state, activeBranchId);
+  useAnchorClicks(scopeRef, state, onShowBranch);
 
   // Follow the conversation: scroll to the end when a message or a placeholder is added.
   const conversationId = state?.conversation.id ?? null;

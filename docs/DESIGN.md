@@ -46,7 +46,8 @@ In:
 - Branch chat.
 - Merge with per-branch take-away, per-point include/exclude.
 - Return-to-main warning.
-- Conversation map: the tree of the current conversation (main, branches, merges) with one node per prompt, labelled by its first words; clicking a node shows that prompt.
+- Conversation map: the current conversation drawn as a graph. Main is a vertical trunk with one node per prompt and per merge; each branch leaves the trunk at its anchor in its own colour, with one node per prompt, and merged branches come back into the trunk at their merge node. Nodes are labelled by the first words of the prompt; clicking one shows that prompt.
+- Anchored passages are clickable: under the pointer they show that they open their branch, and a click opens it in the side panel.
 - Logging of every LLM call (for the experiment).
 
 Out (v2 backlog, §10):
