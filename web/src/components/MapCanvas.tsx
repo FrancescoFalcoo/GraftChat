@@ -1,15 +1,7 @@
-import type { ReactNode } from "react";
 import { NODE_W, type MapLayout, type MapNode } from "../conversationMap";
 import type { View } from "../hooks/usePanZoom";
-import type { BranchStatus } from "../types";
 
-const STATUS_WORD: Record<BranchStatus, string> = {
-  open: "open",
-  merged: "merged",
-  discarded: "discarded",
-};
-
-/** How much text a block shows: none from far away, more as one zooms in. */
+/** How much text a block shows: none from far away, a little more when close. */
 export function zoomLevel(k: number): "far" | "mid" | "near" {
   if (k < 0.55) return "far";
   if (k < 1.25) return "mid";
@@ -36,13 +28,16 @@ interface Props {
   view: View;
   /** The node that is "where you are": it carries the glow. */
   currentKey: string | null;
-  /** Full screen: nodes are buttons. Sidebar preview: a picture, the whole box is one button. */
+  /**
+   * Full screen: blocks with their essential text, selectable. Sidebar preview: only the
+   * shape of the tree, a coloured dot per node.
+   */
   interactive: boolean;
-  onNode?: (node: MapNode) => void;
-  onBranch?: (branchId: number) => void;
+  /** The block whose details are open. */
+  selectedKey?: string | null;
+  onSelect?: (node: MapNode) => void;
   /** A branch to point out (from the logbook). */
   highlightBranchId?: number | null;
-  children?: ReactNode;
 }
 
 /** The conversation map drawn at a given pan and zoom (layout: conversationMap.ts). */
@@ -51,8 +46,8 @@ export function MapCanvas({
   view,
   currentKey,
   interactive,
-  onNode,
-  onBranch,
+  selectedKey = null,
+  onSelect,
   highlightBranchId = null,
 }: Props) {
   const current = layout.nodes.find((n) => n.key === currentKey) ?? null;
@@ -61,7 +56,7 @@ export function MapCanvas({
   return (
     <div
       className="map-layer"
-      data-zoom={zoomLevel(view.k)}
+      data-zoom={interactive ? zoomLevel(view.k) : "dots"}
       style={{
         width: layout.width,
         height: layout.height,
@@ -72,7 +67,7 @@ export function MapCanvas({
         {layout.edges.map((e) => {
           const lit =
             (e.lane === null && currentBranch === null) ||
-            (e.key === `branch-${currentBranch}`) ||
+            e.key === `branch-${currentBranch}` ||
             (highlightBranchId !== null && e.key === `branch-${highlightBranchId}`);
           return (
             <g key={e.key} data-lane={e.lane ?? undefined} data-status={e.status ?? undefined} data-lit={lit ? "" : undefined}>
@@ -83,78 +78,49 @@ export function MapCanvas({
         })}
       </svg>
 
-      {layout.branchLabels.map((b) => {
-        // In the preview the text is drawn by CSS (attr()), so it is not page text twice.
-        const content = interactive ? (
-          <>
-            <span className="map-quote">«{b.quote}»</span>
-            <span className="map-status">{STATUS_WORD[b.status]}</span>
-          </>
-        ) : (
-          <>
-            <span className="map-quote" data-text={`«${b.quote}»`} />
-            <span className="map-status" data-text={STATUS_WORD[b.status]} />
-          </>
-        );
-        const common = {
-          className: "map-branch-label",
-          style: { left: b.x, top: b.y },
-          "data-lane": b.lane,
-          "data-status": b.status,
-          "data-highlight": highlightBranchId === b.branchId ? "" : undefined,
-          title: `«${b.quote}» (${STATUS_WORD[b.status]})`,
-        };
-        return interactive ? (
-          <button
-            key={`label-${b.branchId}`}
-            type="button"
-            {...common}
-            aria-label={`Open the branch on «${b.quote}» (${STATUS_WORD[b.status]})`}
-            onClick={() => onBranch?.(b.branchId)}
-          >
-            {content}
-          </button>
-        ) : (
-          <span key={`label-${b.branchId}`} {...common} aria-hidden="true">
-            {content}
-          </span>
-        );
-      })}
-
       {layout.nodes.map((n) => {
-        const common = {
-          className: `map-node map-node-${n.kind}`,
-          style: n.kind === "merge" ? { left: n.x, top: n.y } : { left: n.x, top: n.y, width: NODE_W },
+        const marks = {
           "data-lane": n.lane ?? undefined,
           "data-status": n.status ?? undefined,
           "data-current": n.key === currentKey ? "" : undefined,
-          "data-highlight": highlightBranchId !== null && n.branchId === highlightBranchId ? "" : undefined,
-          title: n.full,
         };
-        const content = (
-          <>
-            <Glyph kind={n.kind} />
-            {interactive ? (
-              <span className="map-label">{n.label}</span>
-            ) : (
-              <span className="map-label" data-text={n.label} />
-            )}
-          </>
-        );
-        return interactive ? (
+        if (!interactive) {
+          return (
+            <span
+              key={n.key}
+              className={`map-dot map-dot-${n.kind}`}
+              style={{ left: n.x, top: n.y }}
+              aria-hidden="true"
+              {...marks}
+            />
+          );
+        }
+        const name =
+          n.kind === "merge"
+            ? "Merge"
+            : n.kind === "empty"
+              ? `Branch on «${n.quote}», no messages yet`
+              : n.full;
+        return (
           <button
             key={n.key}
             type="button"
-            {...common}
-            aria-label={n.kind === "merge" ? "Go to this merge" : `Go to: ${n.full}`}
-            onClick={() => onNode?.(n)}
+            className={`map-node map-node-${n.kind}`}
+            style={n.kind === "merge" ? { left: n.x, top: n.y } : { left: n.x, top: n.y, width: NODE_W }}
+            {...marks}
+            data-selected={n.key === selectedKey ? "" : undefined}
+            data-highlight={highlightBranchId !== null && n.branchId === highlightBranchId ? "" : undefined}
+            aria-pressed={n.key === selectedKey}
+            aria-label={`Details: ${name}`}
+            onClick={() => onSelect?.(n)}
           >
-            {content}
+            <Glyph kind={n.kind} />
+            <span className="map-node-text">
+              {n.quote !== null && n.kind === "prompt" && <span className="map-node-quote">«{n.quote}»</span>}
+              <span className="map-label">{n.kind === "empty" ? `«${n.quote}»` : n.label}</span>
+              {n.kind === "empty" && <span className="map-node-note">No messages yet</span>}
+            </span>
           </button>
-        ) : (
-          <span key={n.key} {...common} aria-hidden="true">
-            {content}
-          </span>
         );
       })}
     </div>

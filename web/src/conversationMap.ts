@@ -58,6 +58,8 @@ export interface MapNode {
   branchId: number | null;
   lane: number | null;
   status: BranchStatus | null;
+  /** The anchored passage, on the first node of a branch: where it starts from. */
+  quote: string | null;
 }
 
 export interface MapEdge {
@@ -223,6 +225,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         branchId: null,
         lane: null,
         status: null,
+        quote: null,
       });
     });
   }
@@ -265,6 +268,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         branchId: p.id,
         lane: p.lane,
         status: p.status,
+        quote: p.quote,
       });
     }
     p.prompts.forEach((m, i) => {
@@ -279,6 +283,7 @@ export function layoutConversationMap(state: ConversationState): MapLayout {
         branchId: p.id,
         lane: p.lane,
         status: p.status,
+        quote: i === 0 ? p.quote : null,
       });
     });
   }

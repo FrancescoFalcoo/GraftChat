@@ -131,22 +131,51 @@ describe("layoutConversationMap", () => {
 });
 
 describe("ConversationMap", () => {
-  it("jumps to a main prompt, a branch prompt, a merge, and opens a branch", () => {
+  const open = (name: string) => fireEvent.click(screen.getByRole("button", { name: `Details: ${name}` }));
+
+  it("shows a block's details on click, and goes there only from the details", () => {
     const onJump = vi.fn();
     const onOpenBranch = vi.fn();
     render(<ConversationMap state={state()} onJump={onJump} onOpenBranch={onOpenBranch} onClose={() => {}} />);
 
     expect(screen.getByRole("dialog", { name: "Conversation map" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Go to: guru" }));
+    open("guru");
+    expect(onJump).not.toHaveBeenCalled();
+    const details = screen.getByRole("region", { name: "Selected block" });
+    expect(details.textContent).toContain("On main");
+    expect(details.textContent).toContain("ok"); // the answer
+    fireEvent.click(screen.getByRole("button", { name: "Go to this prompt" }));
     expect(onJump).toHaveBeenLastCalledWith(6, null);
-    fireEvent.click(screen.getByRole("button", { name: "Go to: cane" }));
+
+    open("cane");
+    expect(screen.getByRole("region", { name: "Selected block" }).textContent).toContain("In the branch on «more»");
+    fireEvent.click(screen.getByRole("button", { name: "Go to this prompt" }));
     expect(onJump).toHaveBeenLastCalledWith(301, 30);
+    fireEvent.click(screen.getByRole("button", { name: "Open branch" }));
+    expect(onOpenBranch).toHaveBeenLastCalledWith(30);
+
+    open("Merge");
     fireEvent.click(screen.getByRole("button", { name: "Go to this merge" }));
     expect(onJump).toHaveBeenLastCalledWith(5, null);
-    fireEvent.click(screen.getByRole("button", { name: "Open the branch on «alto» (merged)" }));
-    expect(onOpenBranch).toHaveBeenLastCalledWith(10);
-    fireEvent.click(screen.getByRole("button", { name: "Go to: Branch on «life», no messages yet" }));
+
+    open("Branch on «life», no messages yet");
+    fireEvent.click(screen.getByRole("button", { name: "Open branch" }));
     expect(onOpenBranch).toHaveBeenLastCalledWith(40);
+  });
+
+  it("lists the branches that start from an answer on main", () => {
+    render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
+    open("napoleone");
+    const details = screen.getByRole("region", { name: "Selected block" });
+    expect(details.textContent).toContain("Branches from this answer");
+    expect(details.querySelectorAll(".node-branch-chip").length).toBe(3);
+  });
+
+  it("puts the passage on the first block of each branch, not on the curves", () => {
+    render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
+    const quotes = [...document.querySelectorAll(".map-node-quote")].map((q) => q.textContent);
+    expect(quotes).toEqual(["«alto»", "«and»", "«more»"]);
+    expect(document.querySelector(".map-branch-label")).toBeNull();
   });
 
   it("says so when there is nothing to map", () => {
@@ -205,16 +234,39 @@ describe("buildLogbook", () => {
 });
 
 describe("ConversationMap full screen", () => {
-  it("closes with Escape and with its button, and shows the logbook", () => {
+  it("has several ways out: Back to chat, Close map, the × and Escape", () => {
     const onClose = vi.fn();
     render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: "Back to chat" }));
+    for (const b of screen.getAllByRole("button", { name: "Close map" })) fireEvent.click(b);
+    expect(onClose).toHaveBeenCalledTimes(3);
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Conversation map" }), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(4);
+  });
+
+  it("closes the details first on Escape, then the map", () => {
+    const onClose = vi.fn();
+    render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: "Details: guru" }));
     const dialog = screen.getByRole("dialog", { name: "Conversation map" });
-    expect(screen.getByRole("complementary", { name: "Logbook" })).toBeTruthy();
-    expect(screen.getByText("Merge 1")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Selected block" })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Close map" }));
-    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps each merged branch closed in the logbook until clicked", () => {
+    const s = state();
+    s.branches[0].points = [
+      { id: 1, branch_id: 10, position: 0, title: "kept title", text_generated: "t", text_final: "kept text", included: true, origin: "model" },
+    ];
+    render(<ConversationMap state={s} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
+    expect(screen.getByText("Merge 1")).toBeTruthy();
+    expect(screen.queryByText("kept title")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /«alto».*1 point kept/ }));
+    fireEvent.click(screen.getByRole("button", { name: "kept title" }));
+    expect(screen.getByText("kept text")).toBeTruthy();
   });
 
   it("zooms with its buttons and marks where you are", () => {
@@ -224,25 +276,18 @@ describe("ConversationMap full screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     expect(value()).not.toBe(before);
     const current = document.querySelector(".map-node[data-current]");
-    expect(current?.getAttribute("aria-label")).toBe("Go to: bav"); // last prompt of the open branch
-  });
-
-  it("hides and shows the logbook", () => {
-    render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Hide logbook" }));
-    expect(screen.queryByRole("complementary", { name: "Logbook" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Logbook" }));
-    expect(screen.getByRole("complementary", { name: "Logbook" })).toBeTruthy();
+    expect(current?.getAttribute("aria-label")).toBe("Details: bav"); // last prompt of the open branch
   });
 });
 
 describe("MiniMap", () => {
-  it("is a picture of the map that opens it, and does not repeat the chat's text", async () => {
+  it("draws only the shape of the tree, a dot per node, and opens the map", async () => {
     const { MiniMap } = await import("../components/MiniMap");
     const onToggle = vi.fn();
     render(<MiniMap state={state()} panelBranchId={null} open={false} onToggle={onToggle} />);
-    expect(screen.queryByText("guru")).toBeNull(); // drawn through CSS attr(), not page text
-    expect(document.querySelector('[data-text="guru"]')).toBeTruthy();
+    expect(screen.queryByText("guru")).toBeNull();
+    expect(document.querySelectorAll(".map-dot").length).toBe(layoutConversationMap(state()).nodes.length);
+    expect(document.querySelectorAll(".map-dot[data-lane]").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Open the conversation map full screen" }));
     fireEvent.click(screen.getByRole("button", { name: "Open map" }));
     expect(onToggle).toHaveBeenCalledTimes(2);

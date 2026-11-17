@@ -5,6 +5,7 @@ import { buildLogbook } from "../logbook";
 import type { ConversationState } from "../types";
 import { Logbook } from "./Logbook";
 import { currentNodeKey, MapCanvas } from "./MapCanvas";
+import { NodeDetails } from "./NodeDetails";
 
 interface Props {
   state: ConversationState;
@@ -17,26 +18,23 @@ interface Props {
   onClose: () => void;
 }
 
-const LOGBOOK_KEY = "graftchat.logbookOpen";
 const STEP = 1.25;
 
-function loadLogbookOpen(): boolean {
-  try {
-    return window.localStorage.getItem(LOGBOOK_KEY) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-/** The whole tree of the current conversation, full screen, with its logbook. */
+/**
+ * The whole tree of the current conversation, full screen. On the left: what it is, the
+ * zoom and the logbook. On the right: the tree; a click on a block opens its details, and
+ * only from there one goes to it. Ways out: "Back to chat" and "Close map" on the left, ×
+ * top right, Escape.
+ */
 export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBranch, onClose }: Props) {
   const layout = useMemo(() => layoutConversationMap(state), [state]);
   const logbook = useMemo(() => buildLogbook(state), [state]);
   const currentKey = currentNodeKey(layout, panelBranchId);
   const { viewportRef, view, zoomBy, fit, centerOn, panBy, handlers } = usePanZoom({ interactive: true });
-  const [logOpen, setLogOpen] = useState(loadLogbookOpen);
   const [highlight, setHighlight] = useState<number | null>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const selected = layout.nodes.find((n) => n.key === selectedKey) ?? null;
 
   const showCurrent = (): void => {
     const node = layout.nodes.find((n) => n.key === currentKey);
@@ -59,21 +57,14 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
   }, [layout, currentKey, fit, centerOn, viewportRef]);
 
   useEffect(() => {
-    closeRef.current?.focus();
+    backRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LOGBOOK_KEY, logOpen ? "1" : "0");
-    } catch {
-      // per-browser convenience only
-    }
-  }, [logOpen]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      if (selectedKey !== null) setSelectedKey(null); // first the details, then the map
+      else onClose();
       return;
     }
     if ((e.target as HTMLElement).closest("input, textarea")) return;
@@ -93,31 +84,67 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
 
   const showBranch = (branchId: number): void => {
     setHighlight(branchId);
-    const label = layout.branchLabels.find((b) => b.branchId === branchId);
-    if (label) centerOn(label.x, label.y + 60, Math.max(view.k, 0.8));
+    const first = layout.nodes.find((n) => n.branchId === branchId);
+    if (first) centerOn(first.x, first.y, Math.max(view.k, 0.8));
   };
 
-  const jumpNode = (n: MapNode): void => {
+  const visit = (n: MapNode): void => {
     if (n.messageId !== null) onJump(n.messageId, n.branchId);
     else if (n.branchId !== null) onOpenBranch(n.branchId);
   };
 
   return (
-    <div
-      className="map-screen"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Conversation map"
-      onKeyDown={onKeyDown}
-      data-log={logOpen ? "open" : "closed"}
-    >
-      <header className="map-head">
-        <h2 className="map-title">{state.conversation.title}</h2>
-        <p className="map-sub">
-          {logbook.prompts} prompt{logbook.prompts === 1 ? "" : "s"} on main, {state.branches.length} branch
-          {state.branches.length === 1 ? "" : "es"}
-        </p>
-      </header>
+    <div className="map-screen" role="dialog" aria-modal="true" aria-label="Conversation map" onKeyDown={onKeyDown}>
+      <aside className="map-side" aria-label="About this map">
+        <button ref={backRef} type="button" className="btn btn-small map-back" onClick={onClose}>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          Back to chat
+        </button>
+
+        <header className="map-head">
+          <h2 className="map-title">{state.conversation.title}</h2>
+          <p className="map-sub">
+            {logbook.prompts} prompt{logbook.prompts === 1 ? "" : "s"} on main, {state.branches.length} branch
+            {state.branches.length === 1 ? "" : "es"}
+          </p>
+        </header>
+
+        <div className="map-controls" role="group" aria-label="View">
+          <div className="map-zoom" role="group" aria-label="Zoom">
+            <button type="button" className="btn btn-small" aria-label="Zoom out" onClick={() => zoomBy(1 / STEP)}>
+              −
+            </button>
+            <output className="map-zoom-value" aria-live="polite">
+              {Math.round(view.k * 100)}%
+            </output>
+            <button type="button" className="btn btn-small" aria-label="Zoom in" onClick={() => zoomBy(STEP)}>
+              +
+            </button>
+          </div>
+          <button type="button" className="btn btn-small" onClick={() => fit(layout.width, layout.height, 1)}>
+            Fit
+          </button>
+          <button type="button" className="btn btn-small" onClick={showCurrent} disabled={currentKey === null}>
+            Where I am
+          </button>
+        </div>
+        <p className="map-hint">Drag to move, wheel to zoom. Click a block for its details.</p>
+
+        <div className="map-side-scroll">
+          <Logbook
+            logbook={logbook}
+            onShowBranch={showBranch}
+            onOpenBranch={onOpenBranch}
+            onJump={(id) => onJump(id, null)}
+          />
+        </div>
+
+        <button type="button" className="btn map-close" onClick={onClose}>
+          Close map
+        </button>
+      </aside>
 
       <div
         ref={viewportRef}
@@ -134,55 +161,27 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
             view={view}
             currentKey={currentKey}
             interactive
+            selectedKey={selectedKey}
             highlightBranchId={highlight}
-            onNode={jumpNode}
-            onBranch={onOpenBranch}
+            onSelect={(n) => setSelectedKey((key) => (key === n.key ? null : n.key))}
           />
         )}
       </div>
 
-      <div className="map-controls">
-        <button ref={closeRef} type="button" className="btn map-close" onClick={onClose}>
-          Close map
-        </button>
-        <div className="map-zoom" role="group" aria-label="Zoom">
-          <button type="button" className="btn btn-small" aria-label="Zoom out" onClick={() => zoomBy(1 / STEP)}>
-            −
-          </button>
-          <output className="map-zoom-value" aria-live="polite">
-            {Math.round(view.k * 100)}%
-          </output>
-          <button type="button" className="btn btn-small" aria-label="Zoom in" onClick={() => zoomBy(STEP)}>
-            +
-          </button>
-        </div>
-        <button type="button" className="btn btn-small" onClick={() => fit(layout.width, layout.height, 1)}>
-          Fit
-        </button>
-        <button type="button" className="btn btn-small" onClick={showCurrent} disabled={currentKey === null}>
-          Where I am
-        </button>
-      </div>
-
-      <button
-        type="button"
-        className="btn btn-small map-log-toggle"
-        aria-expanded={logOpen}
-        aria-controls="map-logbook"
-        onClick={() => setLogOpen((v) => !v)}
-      >
-        {logOpen ? "Hide logbook" : "Logbook"}
+      <button type="button" className="icon-btn map-x" aria-label="Close map" onClick={onClose}>
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+          <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
       </button>
-      {logOpen && (
-        <aside className="map-log" id="map-logbook" aria-label="Logbook">
-          <h2 className="map-log-title">Logbook</h2>
-          <Logbook
-            logbook={logbook}
-            onShowBranch={showBranch}
-            onOpenBranch={onOpenBranch}
-            onJump={(id) => onJump(id, null)}
-          />
-        </aside>
+
+      {selected && (
+        <NodeDetails
+          node={selected}
+          state={state}
+          onVisit={visit}
+          onOpenBranch={onOpenBranch}
+          onClose={() => setSelectedKey(null)}
+        />
       )}
     </div>
   );
