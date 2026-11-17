@@ -34,3 +34,31 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  launcher:
+    name: python start.py on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Start from a fresh clone with canned answers, wait for the server
+        shell: bash
+        run: |
+          python start.py --fake --no-browser --port 8765 > start.log 2>&1 &
+          for i in $(seq 1 150); do
+            if curl -fs http://127.0.0.1:8765/api/health > /dev/null; then
+              curl -fs http://127.0.0.1:8765/ | grep -q '<div id="root">' && echo "up after $((i * 2))s" && exit 0
+            fi
+            sleep 2
+          done
+          cat start.log
+          exit 1

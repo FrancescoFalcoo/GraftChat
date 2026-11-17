@@ -27,7 +27,7 @@ def main() -> None:
 
     print(f"GraftChat: {url}")
     if not built:
-        print("  The frontend is not built: run 'npm install' and 'npm run build' in web/.")
+        print("  The frontend is not built: run 'python start.py' (or 'npm ci' and 'npm run build' in web/).")
     print(f"  Data folder: {config.home}")
     if config.fake_llm:
         print("  GRAFTCHAT_FAKE_LLM is on: answers are canned, no call leaves this computer.")
