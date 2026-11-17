@@ -1,3 +1,4 @@
+import { BranchUsage } from "./Usage";
 import { useEffect, useRef, useState } from "react";
 import type { PendingRequest } from "../hooks/useGraft";
 import { plainQuote } from "../lanes";
@@ -86,6 +87,7 @@ export function BranchPanel({
         <blockquote className="panel-quote" title={branch.anchor_quote}>
           {plainQuote(branch.anchor_quote)}
         </blockquote>
+        <BranchUsage branchId={branch.id} />
         {known.length > 0 && (
           <p
             className="panel-known"

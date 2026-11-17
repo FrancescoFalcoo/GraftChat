@@ -1,3 +1,4 @@
+import type { Usage } from "./usage";
 // Shapes copied from docs/API.md. Offsets are Unicode code points.
 
 export type Role = "user" | "assistant" | "merge";
@@ -69,6 +70,8 @@ export interface ConversationState {
   main: Message[];
   branches: Branch[];
   pending_branch_ids: number[] | null;
+  /** Tokens and cost of the model calls (absent from servers older than migration 0006). */
+  usage?: Usage;
 }
 
 export interface Settings {

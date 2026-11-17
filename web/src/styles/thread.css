@@ -15,11 +15,17 @@
 }
 
 .chat-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   padding: var(--space-3) var(--col-pad);
   border-bottom: 1px solid var(--rule);
 }
 
 .chat-head h1 {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   font-size: var(--text-m);
   font-weight: 600;
@@ -853,4 +859,118 @@ a.attach-doc:hover {
   .turn-merge:has(> .merge-node[data-fresh])::after {
     animation: none;
   }
+}
+
+/* ---- usage: tokens and cost (Settings, "Show tokens and cost") ---------------------- */
+
+.usage-line {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+.usage-branch {
+  margin-top: var(--space-2);
+}
+
+.usage-summary {
+  flex: none;
+  font-size: var(--text-s);
+}
+
+.usage-summary > summary {
+  padding: 4px var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s);
+  color: var(--ink-soft);
+  list-style: none;
+  cursor: pointer;
+}
+
+.usage-summary > summary::-webkit-details-marker {
+  display: none;
+}
+
+.usage-summary > summary:hover,
+.usage-summary[open] > summary {
+  border-color: var(--edge);
+  color: var(--ink);
+}
+
+.usage-summary > summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.usage-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: var(--col-pad);
+  z-index: 20;
+  width: min(440px, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table caption {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  text-align: left;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 3px var(--space-1);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.usage-table th[scope="row"] {
+  max-width: 170px;
+  overflow: hidden;
+  font-weight: 400;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.usage-table thead th {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.usage-table tbody tr:last-child th,
+.usage-table tbody tr:last-child td {
+  padding-bottom: var(--space-2);
+}
+
+.usage-threads {
+  border-top: 1px solid var(--rule);
+}
+
+.usage-threads tr:first-child th,
+.usage-threads tr:first-child td {
+  padding-top: var(--space-2);
+}
+
+.usage-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-1);
+  border-radius: 50%;
+  background: var(--lane);
+}
+
+.usage-note {
+  margin: var(--space-2) 0 0;
+  color: var(--ink-soft);
 }

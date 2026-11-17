@@ -10,6 +10,9 @@ interface Props {
   onSaved: (settings: Settings) => void;
   onClose: () => void;
   onError: (error: unknown) => void;
+  /** Tokens and cost shown in the chat (a choice of this browser, applied at once). */
+  showUsage: boolean;
+  onShowUsage: (on: boolean) => void;
 }
 
 interface ModelFieldProps {
@@ -83,7 +86,7 @@ function KeyStatus({ info }: { info: Settings["key_info"] }) {
   );
 }
 
-export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
+export function SettingsModal({ settings, onSaved, onClose, onError, showUsage, onShowUsage }: Props) {
   const [apiKey, setApiKey] = useState("");
   const [cap, setCap] = useState(String(settings.spend_cap_usd));
   const [sound, setSound] = useState(isSoundOn());
@@ -236,6 +239,17 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
             onChange={(e) => setCap(e.target.value)}
           />
           <p className="field-note">Set it to 0 to use free models only.</p>
+        </div>
+
+        <div className="field">
+          <label className="check-label">
+            <input type="checkbox" checked={showUsage} onChange={(e) => onShowUsage(e.target.checked)} />
+            Show tokens and cost
+          </label>
+          <p className="field-note">
+            Under each answer, in the chat header and in each branch: what was sent to the model and
+            what it cost. Saved in this browser only.
+          </p>
         </div>
 
         <div className="field">

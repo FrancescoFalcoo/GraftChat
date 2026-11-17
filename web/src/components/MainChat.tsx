@@ -1,3 +1,4 @@
+import { ChatUsage } from "./Usage";
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useAnchorClicks } from "../hooks/useAnchorClicks";
 import { useAnchorHighlights } from "../hooks/useAnchorHighlights";
@@ -109,6 +110,7 @@ export function MainChat({
     <main className="chat">
       <header className="chat-head">
         <h1>{state?.conversation.title ?? "GraftChat"}</h1>
+        <ChatUsage state={state} />
       </header>
       <div className="chat-scroll" ref={scrollRef}>
         <div className="chat-col" ref={scopeRef}>

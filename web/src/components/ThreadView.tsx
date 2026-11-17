@@ -1,3 +1,4 @@
+import { AnswerUsageLine } from "./Usage";
 import type { ReactNode } from "react";
 import { attachmentUrl } from "../api";
 import { useFreshIds } from "../hooks/useFreshIds";
@@ -147,6 +148,7 @@ export function ThreadView({
             data-fresh={freshAnswers.has(m.id) ? "" : undefined}
           >
             <MessageContent content={m.content} messageId={m.id} selectable={selectable} />
+            <AnswerUsageLine messageId={m.id} />
             {renderBelow ? renderBelow(m) : null}
           </div>
         );
