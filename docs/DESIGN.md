@@ -2,7 +2,7 @@
 
 Anchored branching chat for LLMs: graft side conversations onto any passage of an answer, then bring back only what matters.
 
-**Status:** v1 design, frozen on 2026-11-01. Anything not listed in v1 scope is out of scope until v1 ships.
+**Status:** v1 implemented (milestones 1–4 of §13). The v1 scope was frozen on 2026-11-01: anything not listed in §4 is out of scope for v1.
 
 | Amended | Change |
 |---|---|
@@ -10,16 +10,17 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-13 | Added §14 Decisions (thread roots, empty threads, where merge blocks and anchor notes go, empty merges); §6 and §7 aligned. |
 | 2026-11-15 | Added §14.5 branch state machine and §14.6 `merge_branch` checks; restore, archive and multiple merges added to the v2 backlog (§10). |
 | 2026-11-16 | Added §14.7–§14.10 (what `check_invariants` and `pending_branches` cover, context building details). `api/` and `web/` implemented against [API.md](API.md). |
+| 2026-11-17 | Editorial pass: neutral tone; §9 restated as module responsibilities; §4, §8 and §12 aligned with the implementation. |
 
 ## 1. Problem
 
-LLM chat interfaces are linear. When an answer contains several points (1, 2, 3, 4…) and I want to follow up on two of them separately, I can't: every follow-up lands at the bottom of the conversation. The original answer drifts further away, the sub-discussions get mixed, and every tangent stays in the model's context forever.
+LLM chat interfaces are linear. When an answer contains several points (1, 2, 3, 4…) and the user wants to follow up on two of them separately, there is no way to do it: every follow-up lands at the bottom of the conversation. The original answer drifts further away, the sub-discussions get mixed, and every tangent stays in the model's context forever.
 
 ## 2. Idea
 
 1. Chat normally on a main thread.
-2. Select one or more lines of any assistant answer → a side panel opens a branch anchored to that passage, where I chat about it as if it were a new conversation.
-3. Back on main, I merge: for each branch the LLM produces a take-away made of short points. I pick which points go back into the main context.
+2. Select one or more lines of any assistant answer → a side panel opens a branch anchored to that passage, where the user discusses it as if it were a new conversation.
+3. Back on main, the user merges: for each branch the LLM produces a take-away made of short points, and the user picks which points go back into the main context.
 
 ## 3. Research question
 
@@ -32,13 +33,13 @@ When returning to the main thread after one or more branches, what should the mo
 | C. Take-away | Only the auto-generated take-away points |
 | D. Excluded | Nothing |
 
-Measured: input tokens, quality of the next main answer, contamination (branch content leaking where it shouldn't). Starting point: ContextBranch (arXiv 2512.13914), which compares branched vs linear but does not test a summarised merge. To verify before running: that this condition is not already covered.
+Measured: input tokens, quality of the next main answer, contamination (branch content leaking where it should not). Starting point: ContextBranch (arXiv 2512.13914), which compares branched vs linear but does not test a summarised merge. To verify before running: that this condition is not already covered.
 
 ## 4. v1 scope
 
 In:
 
-- BYOK: user pastes own API key (one provider in v1, OpenRouter, free models). Hard monthly spend cap enforced client-side.
+- BYOK: user pastes own API key (one provider in v1, OpenRouter, free models). Monthly spend cap, checked before every model call.
 - Normal chat on main (no streaming).
 - Select text in an assistant message → open branch in side panel.
 - Branch chat.
@@ -60,7 +61,7 @@ Out (v2 backlog, §10):
 2. **Main chat:** like any LLM chat.
 3. **Branch:** select one or more lines of an assistant message → "Open branch" → side panel. The selected passage is shown quoted at the top of the panel.
 4. **Back to main:** closing the panel returns to main. If there are branches with no merge decision, a non-intrusive but visible banner appears: "You came back from N branches. Merge?". Ignoring it is allowed: the user can keep chatting and merge later.
-5. **Merge** (any time, while on main): for each pending branch, the LLM generates a take-away. The merge panel shows, per branch, a Notion-style checklist:
+5. **Merge** (any time, while on main): for each pending branch, the LLM generates a take-away. The merge panel shows, per branch, a checklist:
    - each row = one point: short title (e.g. "added X", "solved Y", "noted Z") + checkbox;
    - a ▾ chevron expands the row to show the text that will actually enter the context;
    - the text is editable. Branches can be merged or discarded independently.
@@ -137,23 +138,21 @@ Sibling branches are not visible to each other (isolation).
 ## 8. Take-away generation
 
 - Triggered on merge, once per branch, cached in `takeaway_point`; never regenerated silently.
-- Lightweight free model (e.g. Gemma 4 26B A4B via OpenRouter), structured JSON output: `[{ "title": "...", "text": "..." }]`, titles ≤ 5 words, 1–6 points.
-- Default: all points checked (fast path: the user is in a hurry). The risk is that unread points enter the context; this is accepted and documented as a limitation.
+- Lightweight free model (e.g. Gemma 4 26B A4B via OpenRouter), JSON output `[{ "title": "...", "text": "..." }]`, titles ≤ 5 words, 1–6 points. The format is requested in the prompt; the answer is parsed tolerantly (code fences, surrounding prose) and requested once more if it cannot be read.
+- Default: all points checked (fast path for a user who wants to move on). The risk is that unread points enter the context; this is accepted and documented as a limitation.
 
-## 9. Ownership
+## 9. Module responsibilities
 
-| Written by Francesco (core, must be defensible in an interview) | Delegated to Claude Code |
+| Module | Responsibility |
 |---|---|
-| Tree/data model and its invariants | UI components, side panel, merge checklist |
-| Context builder (§7) | Provider API client, retries |
-| Merge logic and point inclusion | SQLite wiring/migrations |
-| Experiment runner and evaluation (§11) | README polish, GIF |
-
-Claude Code may review core code, not write it.
+| `core/` | Data model, tree operations and invariants (§14), context builder (§7), merge logic and point inclusion. Pure Python, no I/O: the part the experiment depends on. |
+| `api/` | HTTP API ([API.md](API.md)), SQLite persistence and migrations, provider client with retries, take-away generation, spend cap, call logging. It decides no tree rule: every rule comes from `core/`. |
+| `web/` | User interface: chat, anchor selection, branch side panel, merge checklist, return-to-main banner. |
+| `experiments/` | Experiment runner and evaluation (§11). |
 
 ## 10. v2 backlog
 
-- Sequential merge at the graft point (Francesco's idea): merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows I learned branch 2's content). Note: this deliberately breaks sibling isolation. Worth testing as an experimental condition E.
+- Sequential merge at the graft point: merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows what branch 2 explained). Note: this deliberately breaks sibling isolation. Worth testing as an experimental condition E.
 - Depth > 1.
 - Multiple panels, timeline/graph view, streaming, more providers (Anthropic, Gemini, Ollama).
 - Trash & restore for discarded branches (DISCARDED → OPEN).
@@ -164,16 +163,19 @@ Claude Code may review core code, not write it.
 
 - **Scenarios:** 15–20, from real conversations with multi-point answers; each scripted as: main prompt → 2–3 anchored branches → a main follow-up that depends (or should not depend) on branch content.
 - **Conditions:** A–D (§3), all with auto-generated, all-checked take-aways.
-- **Metrics:** input tokens; next-answer quality (LLM judge blind to the condition, plus Francesco's blind rating on a subset); contamination.
+- **Metrics:** input tokens; next-answer quality (LLM judge blind to the condition, plus a blind human rating on a subset); contamination.
 - **Output:** results table + 4–6 page technical report (not a paper), with limits stated: small n, LLM-as-judge bias, single provider, author-made scenarios.
 
-## 12. Stack (proposed)
+## 12. Stack
 
 - **Backend:** Python + FastAPI + SQLite (same language as the experiment runner).
-- **Frontend:** plain TypeScript (React/Vite). Text selection with offsets needs a real DOM; Streamlit is not suitable.
-- **Repo layout:** `core/` (Francesco), `api/`, `web/`, `experiments/`, `docs/`.
+- **Frontend:** TypeScript with React and Vite. Text selection with offsets needs a real DOM; Streamlit is not suitable.
+- **Repo layout:** `core/`, `api/`, `web/`, `experiments/`, `docs/`, `tests/`.
 
 ## 13. Milestones
+
+Milestones 1–4 are complete; milestone 5 is next.
+
 
 1. Core: data model + context builder + unit tests (no UI).
 2. Minimal UI: main chat + branch panel.
@@ -197,7 +199,7 @@ Rationale: discarding after a merge would either rewrite main's history (take-aw
 
 **14.6** `merge_branch` takes the conversation's messages and enforces the merge rules inside core: `merge_branch(branch, merge_message, messages)`. The merge node must already be in `messages`. Checks: the branch is OPEN (14.5); the merge node has role `merge`, is on main and belongs to the same conversation; the branch thread is not empty (14.2); the merge node is the last message of main (merging anywhere else is out of scope, §4). Several branches may be merged at the same node, as long as nothing follows it on main. Take-away points are not checked here: a merge with zero checked points is valid (14.4).
 
-Rationale: keeping these rules in core (not in `api/`) makes them unit-testable and part of the defensible core (§9); both checks reuse `thread()`.
+Rationale: keeping these rules in core (not in `api/`) makes them unit-testable and keeps them with the other tree rules (§9); both checks reuse `thread()`.
 
 **14.7** `check_invariants` does not check "`text_generated` is never overwritten". It sees one snapshot of the state, so it cannot know what a field contained before. The rule is enforced where a point is edited: an edit changes only `text_final` (future core function `edit_point`; until then the API's `PATCH /api/points/{id}` can only write `included` and `text_final`).
 
