@@ -34,5 +34,8 @@ The backend serves `web/dist` at `/` in production; all requests go to `/api/...
 - `src/hooks/useGraft.ts`: application state and actions.
 - `src/files.ts`, `src/components/Composer.tsx`: images and documents on a message (pick, paste, drop;
   the same limits as the server).
+- `src/conversationMap.ts`, `src/components/MapCanvas.tsx`, `src/hooks/usePanZoom.ts`: the
+  conversation map (layout, drawing, pan and zoom), shown by `MiniMap.tsx` in the sidebar and
+  `ConversationMap.tsx` full screen; `src/logbook.ts` and `Logbook.tsx` build its logbook.
 - `src/components/`: sidebar, main chat, branch panel, merge dialog, settings.
 - `src/test/`: unit and component tests.

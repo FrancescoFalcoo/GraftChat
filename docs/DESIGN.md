@@ -15,6 +15,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-17 | A branch starts from main as it was when it was opened: it sees the take-aways merged before that moment, even after its anchor (§7, §14.11; `branch.base_message_id` in §6). Images on user messages added to the v1 scope (§4, §6, §14.12). |
 | 2026-11-17 | Documents on user messages (PDF, Word, plain text and code), read to text locally (§4, §6, §14.13). |
 | 2026-11-17 | Take-away points written by hand in the merge checklist (§5, §6, §14.14). |
+| 2026-11-17 | Conversation map redrawn as a tree of blocks with pan and zoom, always visible as a preview in the sidebar, full screen with a logbook (§4). A new branch takes the keyboard focus. |
 
 ## 1. Problem
 
@@ -51,8 +52,12 @@ In:
 - Documents on user messages (PDF with a text layer, Word .docx, plain text and source code), sent to any model as their text (§14.13).
 - Merge with per-branch take-away, per-point include/exclude.
 - Return-to-main warning.
-- Conversation map: the current conversation drawn as a graph. Main is a vertical trunk with one node per prompt and per merge; each branch leaves the trunk at its anchor in its own colour, with one node per prompt, and merged branches come back into the trunk at their merge node. Nodes are labelled by the first words of the prompt; clicking one shows that prompt.
+- Conversation map: the current conversation drawn as a tree, like a skill tree. Main is a vertical trunk with one block per prompt and a knot per merge; each branch leaves the trunk at its anchor in its own colour, with one block per prompt, and merged branches come back into the trunk at their merge knot. Blocks carry the prompt's text (more lines as one zooms in, all of it under the pointer); the passage a branch is anchored to is written where it leaves the trunk. "Where you are" (the open branch, or the end of main) glows.
+  - Always visible as a preview at the bottom of the sidebar, centred on where you are and following the conversation and the open branch.
+  - "Open map" (or a click on the preview) shows it full screen: drag to move, wheel or + and − to zoom (around the pointer), Fit, Where I am, Escape or "Close map" to go back. Clicking a block shows that prompt.
+  - The full-screen map has a logbook: the first prompt, then every merge in order with the points that entered the context (expandable to their text; unticked points readable apart), the branches still open and the discarded ones. Summaries of old messages (docs/CONTEXT.md) will join it.
 - Anchored passages are clickable: under the pointer they show that they open their branch, and a click opens it in the side panel.
+- Opening a branch puts the keyboard in its message box: one types right away.
 - Interface: green-ink theme (light and dark, following the system), serif for the model's answers; the user's messages on the right; the main column widens and centres when no branch is open. Each branch has its own lane colour, used everywhere the branch appears. A new branch puts its composer right under the hint; confirmations use the app's own dialog. Opening a branch and merging play a short synthesised sound and a brief animation (the sound can be switched off in Settings).
 - Logging of every LLM call (for the experiment).
 
