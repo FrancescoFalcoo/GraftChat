@@ -1,5 +1,18 @@
-import { NODE_W, type MapLayout, type MapNode } from "../conversationMap";
+import type { CSSProperties } from "react";
+import { NODE_W, ROW_H, type MapLayout, type MapNode } from "../conversationMap";
 import type { View } from "../hooks/usePanZoom";
+
+/** Size of a dot in the drawing (map.css); merges and "where you are" are a little larger. */
+const DOT = 34;
+
+/**
+ * Dots keep a readable size on screen whatever the zoom: about 12px, less when the rows
+ * are so close that they would touch.
+ */
+export function dotScale(k: number): number {
+  const onScreen = Math.min(12, Math.max(5, ROW_H * k * 0.6));
+  return onScreen / (DOT * k);
+}
 
 /** How much text a block shows: none from far away, a little more when close. */
 export function zoomLevel(k: number): "far" | "mid" | "near" {
@@ -57,11 +70,14 @@ export function MapCanvas({
     <div
       className="map-layer"
       data-zoom={interactive ? zoomLevel(view.k) : "dots"}
-      style={{
-        width: layout.width,
-        height: layout.height,
-        transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`,
-      }}
+      style={
+        {
+          width: layout.width,
+          height: layout.height,
+          transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`,
+          ...(interactive ? {} : { "--dot-scale": dotScale(view.k) }),
+        } as CSSProperties
+      }
     >
       <svg className="map-edges" width={layout.width} height={layout.height} aria-hidden="true">
         {layout.edges.map((e) => {

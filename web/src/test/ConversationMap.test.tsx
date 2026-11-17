@@ -278,6 +278,20 @@ describe("ConversationMap full screen", () => {
     const current = document.querySelector(".map-node[data-current]");
     expect(current?.getAttribute("aria-label")).toBe("Details: bav"); // last prompt of the open branch
   });
+
+  it("folds the logbook away and remembers it", () => {
+    window.localStorage.clear();
+    const view = () => render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
+    view();
+    expect(screen.getByText("Merge 1")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Logbook/ }));
+    expect(screen.queryByText("Merge 1")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Logbook/ }).textContent).toMatch(/1 merge, 0 points/);
+    cleanup();
+    view();
+    expect(screen.queryByText("Merge 1")).toBeNull();
+    window.localStorage.clear();
+  });
 });
 
 describe("MiniMap", () => {
@@ -298,5 +312,26 @@ describe("MiniMap", () => {
     render(<MiniMap state={{ ...state(), main: [], branches: [] }} panelBranchId={null} open={false} onToggle={() => {}} />);
     expect(screen.getByText(/appears here once you ask something/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Open map" })).toHaveProperty("disabled", true);
+  });
+
+  it("can be folded away, keeping the Open map button", async () => {
+    window.localStorage.clear();
+    const { MiniMap } = await import("../components/MiniMap");
+    render(<MiniMap state={state()} panelBranchId={null} open={false} onToggle={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Hide the map preview" }));
+    expect(document.querySelectorAll(".map-dot").length).toBe(0);
+    expect(screen.getByRole("button", { name: "Open map" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show the map preview" }));
+    expect(document.querySelectorAll(".map-dot").length).toBeGreaterThan(0);
+    window.localStorage.clear();
+  });
+
+  it("keeps dots about the same size on screen at any zoom", async () => {
+    const { dotScale } = await import("../components/MapCanvas");
+    for (const k of [0.07, 0.15, 0.3, 0.5]) {
+      const onScreen = 34 * k * dotScale(k);
+      expect(onScreen).toBeGreaterThanOrEqual(5);
+      expect(onScreen).toBeLessThanOrEqual(12);
+    }
   });
 });

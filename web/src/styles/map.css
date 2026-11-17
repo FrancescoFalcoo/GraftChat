@@ -245,6 +245,7 @@
 
 /* ---- dots (sidebar preview): the shape of the tree, nothing else ---------------------- */
 
+/* The layer sets --dot-scale so that a dot stays about 12px on screen at any zoom. */
 .map-dot {
   position: absolute;
   box-sizing: border-box;
@@ -252,18 +253,18 @@
   height: 34px;
   border-radius: 50%;
   background: var(--lane, var(--ink));
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--dot-scale, 1));
 }
 
 .map-dot-merge {
   width: 46px;
   height: 46px;
-  border: 9px solid var(--ink);
+  border: 10px solid var(--ink);
   background: var(--ground);
 }
 
 .map-dot-empty {
-  border: 6px dashed var(--lane);
+  border: 7px dashed var(--lane);
   background: var(--ground);
 }
 
@@ -272,19 +273,25 @@
 }
 
 .map-dot[data-current] {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   box-shadow:
     0 0 0 12px var(--lane-tint-strong, color-mix(in srgb, var(--ink) 30%, transparent)),
-    0 0 50px 16px var(--lane-tint, color-mix(in srgb, var(--ink) 18%, transparent));
+    0 0 40px 14px var(--lane-tint, color-mix(in srgb, var(--ink) 18%, transparent));
+}
+
+/* Lines keep their width on screen too, however small the tree is drawn. */
+[data-zoom="dots"] .map-trunk,
+[data-zoom="dots"] .map-edge {
+  vector-effect: non-scaling-stroke;
 }
 
 [data-zoom="dots"] .map-trunk {
-  stroke-width: 9px;
+  stroke-width: 2.5px;
 }
 
 [data-zoom="dots"] .map-edge {
-  stroke-width: 7px;
+  stroke-width: 2px;
 }
 
 [data-zoom="dots"] .map-halo {
@@ -305,10 +312,50 @@
   margin-bottom: var(--space-2);
 }
 
-.map-dock-name {
+.map-dock-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: calc(-1 * var(--space-1));
+  padding: 4px var(--space-1);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
   color: var(--ink-soft);
+  font: inherit;
   font-size: var(--text-s);
   font-weight: 600;
+  cursor: pointer;
+}
+
+.map-dock-toggle:hover {
+  color: var(--ink);
+}
+
+.map-dock-toggle:focus-visible {
+  outline: 2px solid var(--ink);
+}
+
+.map-dock-chevron {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+[data-shown] > .map-dock-head .map-dock-chevron {
+  transform: none;
+}
+
+.map-dock:not([data-shown]) {
+  padding-bottom: var(--space-3);
+}
+
+.map-dock:not([data-shown]) .map-dock-head {
+  margin-bottom: 0;
 }
 
 .map-dock-view {
@@ -415,14 +462,6 @@
   font-size: var(--text-s);
 }
 
-.map-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
 .map-zoom {
   display: flex;
   align-items: center;
@@ -437,10 +476,37 @@
   text-align: center;
 }
 
+/* The view controls float over the tree, bottom right, next to what they move. */
+.map-toolbar {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  pointer-events: none; /* only the buttons take clicks: the tree stays draggable around them */
+}
+
+.map-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+}
+
 .map-hint {
-  margin: var(--space-2) 0 0;
+  margin: 0;
+  padding: 0 var(--space-2);
   color: var(--ink-soft);
   font-size: var(--text-s);
+  text-shadow: 0 0 6px var(--ground);
 }
 
 .map-side-scroll {
@@ -480,7 +546,7 @@
   display: flex;
   flex-direction: column;
   width: min(380px, calc(100vw - 420px));
-  max-height: calc(100% - 100px);
+  max-height: calc(100% - 180px); /* clear of the zoom bar below */
   border: 1px solid var(--rule);
   border-top: 4px solid var(--lane, var(--ink));
   border-radius: var(--radius-l);
@@ -598,6 +664,49 @@
 .log-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-l);
+}
+
+.logbook:not([data-shown]) .log-title {
+  margin-bottom: 0;
+}
+
+.log-title-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  width: 100%;
+  margin-left: calc(-1 * var(--space-1));
+  padding: 4px var(--space-1);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-title-toggle:hover {
+  background: var(--surface-raised, color-mix(in srgb, var(--ink) 6%, transparent));
+}
+
+.log-title-toggle:focus-visible {
+  outline: 2px solid var(--ink);
+}
+
+.log-title-toggle .log-chevron {
+  transform: rotate(-90deg);
+}
+
+.log-title-toggle[aria-expanded="true"] .log-chevron {
+  transform: none;
+}
+
+.log-title-meta {
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-weight: 400;
 }
 
 .log-section + .log-section {
@@ -797,6 +906,16 @@
     bottom: var(--space-4);
   }
 
+  .map-toolbar {
+    right: auto;
+    left: var(--space-3);
+    align-items: flex-start;
+  }
+
+  .map-hint {
+    display: none;
+  }
+
   .node-details {
     top: auto;
     bottom: var(--space-4);
@@ -819,7 +938,7 @@
     margin: 0;
   }
 
-  .map-dock-name,
+  .map-dock-toggle,
   .map-dock-empty {
     display: none;
   }

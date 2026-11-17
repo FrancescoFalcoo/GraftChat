@@ -10,18 +10,22 @@ export interface View {
 export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 2.5;
 
-const clamp = (k: number): number => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));
+const clamp = (k: number, min: number): number => Math.min(MAX_ZOOM, Math.max(min, k));
 
 interface Options {
   /** Wheel zooms and the background can be dragged (off for the sidebar preview). */
   interactive: boolean;
+  /** Smallest zoom allowed (the preview shrinks a whole tree into a few centimetres). */
+  minZoom?: number;
 }
 
 /**
  * The view of a pannable, zoomable canvas. The wheel zooms around the pointer, dragging
  * the background pans, and `zoomBy`, `fit` and `centerOn` drive it from buttons and keys.
  */
-export function usePanZoom({ interactive }: Options) {
+export function usePanZoom({ interactive, minZoom = MIN_ZOOM }: Options) {
+  const minRef = useRef(minZoom);
+  minRef.current = minZoom;
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const viewRef = useRef(view);
@@ -39,7 +43,7 @@ export function usePanZoom({ interactive }: Options) {
       const { w, h } = size();
       const px = at?.x ?? w / 2;
       const py = at?.y ?? h / 2;
-      const k = clamp(v.k * factor);
+      const k = clamp(v.k * factor, minRef.current);
       const r = k / v.k;
       return { k, x: px - (px - v.x) * r, y: py - (py - v.y) * r };
     });
@@ -49,7 +53,7 @@ export function usePanZoom({ interactive }: Options) {
   const fit = useCallback((width: number, height: number, maxK = 1) => {
     const { w, h } = size();
     if (w === 0 || h === 0 || width === 0 || height === 0) return;
-    const k = clamp(Math.min(w / width, h / height, maxK));
+    const k = clamp(Math.min(w / width, h / height, maxK), minRef.current);
     setView({ k, x: (w - width * k) / 2, y: (h - height * k) / 2 });
   }, []);
 
@@ -57,7 +61,7 @@ export function usePanZoom({ interactive }: Options) {
   const centerOn = useCallback((px: number, py: number, k?: number) => {
     const { w, h } = size();
     setView((v) => {
-      const kk = clamp(k ?? v.k);
+      const kk = clamp(k ?? v.k, minRef.current);
       return { k: kk, x: w / 2 - px * kk, y: h / 2 - py * kk };
     });
   }, []);

@@ -1,6 +1,9 @@
 import { useState, type ReactNode } from "react";
 import type { Logbook as LogbookData, LogbookBranch } from "../logbook";
 import type { Point } from "../types";
+import { readFlag, writeFlag } from "../util";
+
+const SHOWN_KEY = "graftchat.logbookOpen";
 
 interface Props {
   logbook: LogbookData;
@@ -103,66 +106,89 @@ function MergedBranch({ branch, onShowBranch }: { branch: LogbookBranch; onShowB
 /** What the conversation established so far, from its merges: the map's companion. */
 export function Logbook({ logbook, onShowBranch, onOpenBranch, onJump }: Props) {
   const { start, merges, open, discarded } = logbook;
+  const [shown, setShown] = useState(() => readFlag(SHOWN_KEY, true));
+  const toggle = (): void => {
+    setShown((v) => {
+      writeFlag(SHOWN_KEY, !v);
+      return !v;
+    });
+  };
+  const kept = merges.reduce((n, m) => n + m.branches.reduce((k, b) => k + b.kept.length, 0), 0);
   return (
-    <div className="logbook">
-      <h2 className="log-title">Logbook</h2>
-
-      {start && (
-        <section className="log-section">
-          <h3>It started with</h3>
-          <button type="button" className="log-start" onClick={() => onJump(start.messageId)}>
-            {start.text}
-          </button>
-        </section>
-      )}
-
-      <section className="log-section">
-        <h3>Brought back to main</h3>
-        {merges.length === 0 ? (
-          <p className="log-none">Nothing yet. When you merge a branch, the points you keep are listed here.</p>
-        ) : (
-          <ol className="log-merges">
-            {merges.map((m) => (
-              <li key={m.messageId} className="log-merge">
-                <button type="button" className="log-merge-head" onClick={() => onJump(m.messageId)}>
-                  Merge {m.number}
-                </button>
-                {m.branches.map((b) => (
-                  <MergedBranch key={b.id} branch={b} onShowBranch={onShowBranch} />
-                ))}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      {open.length > 0 && (
-        <section className="log-section">
-          <h3>Still open</h3>
-          {open.map((b) => (
-            <BranchBox
-              key={b.id}
-              branch={b}
-              summary={b.prompts === 0 ? "no messages yet" : `${b.prompts} message${b.prompts === 1 ? "" : "s"}`}
-              onShowBranch={onShowBranch}
-            >
-              <button type="button" className="btn btn-small" onClick={() => onOpenBranch(b.id)}>
-                Open branch
+    <div className="logbook" data-shown={shown ? "" : undefined}>
+      <h2 className="log-title">
+        <button type="button" className="log-title-toggle" aria-expanded={shown} onClick={toggle}>
+          <Chevron />
+          Logbook
+          {!shown && (
+            <span className="log-title-meta">
+              {merges.length === 0
+                ? "nothing merged yet"
+                : `${merges.length} merge${merges.length === 1 ? "" : "s"}, ${kept} point${kept === 1 ? "" : "s"}`}
+            </span>
+          )}
+        </button>
+      </h2>
+      {shown && (
+        <>
+          {start && (
+            <section className="log-section">
+              <h3>It started with</h3>
+              <button type="button" className="log-start" onClick={() => onJump(start.messageId)}>
+                {start.text}
               </button>
-            </BranchBox>
-          ))}
-        </section>
-      )}
+            </section>
+          )}
 
-      {discarded.length > 0 && (
-        <section className="log-section">
-          <h3>Discarded</h3>
-          {discarded.map((b) => (
-            <BranchBox key={b.id} branch={b} summary="discarded" onShowBranch={onShowBranch}>
-              <p className="log-none">It never entered the main context.</p>
-            </BranchBox>
-          ))}
-        </section>
+          <section className="log-section">
+            <h3>Brought back to main</h3>
+            {merges.length === 0 ? (
+              <p className="log-none">Nothing yet. When you merge a branch, the points you keep are listed here.</p>
+            ) : (
+              <ol className="log-merges">
+                {merges.map((m) => (
+                  <li key={m.messageId} className="log-merge">
+                    <button type="button" className="log-merge-head" onClick={() => onJump(m.messageId)}>
+                      Merge {m.number}
+                    </button>
+                    {m.branches.map((b) => (
+                      <MergedBranch key={b.id} branch={b} onShowBranch={onShowBranch} />
+                    ))}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          {open.length > 0 && (
+            <section className="log-section">
+              <h3>Still open</h3>
+              {open.map((b) => (
+                <BranchBox
+                  key={b.id}
+                  branch={b}
+                  summary={b.prompts === 0 ? "no messages yet" : `${b.prompts} message${b.prompts === 1 ? "" : "s"}`}
+                  onShowBranch={onShowBranch}
+                >
+                  <button type="button" className="btn btn-small" onClick={() => onOpenBranch(b.id)}>
+                    Open branch
+                  </button>
+                </BranchBox>
+              ))}
+            </section>
+          )}
+
+          {discarded.length > 0 && (
+            <section className="log-section">
+              <h3>Discarded</h3>
+              {discarded.map((b) => (
+                <BranchBox key={b.id} branch={b} summary="discarded" onShowBranch={onShowBranch}>
+                  <p className="log-none">It never entered the main context.</p>
+                </BranchBox>
+              ))}
+            </section>
+          )}
+        </>
       )}
     </div>
   );

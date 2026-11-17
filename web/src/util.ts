@@ -22,6 +22,24 @@ export function saveLastConversationId(id: number | null): void {
   }
 }
 
+/** A remembered on/off choice of the interface (a folded panel), `fallback` if unknown. */
+export function readFlag(key: string, fallback: boolean): boolean {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw === null ? fallback : raw === "1";
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeFlag(key: string, on: boolean): void {
+  try {
+    window.localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    // Not remembered: the choice holds until the page is reloaded.
+  }
+}
+
 /** Shortens to about `max` characters (code points), on one line, with an ellipsis. */
 export function truncate(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ").trim();

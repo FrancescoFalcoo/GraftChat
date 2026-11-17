@@ -21,8 +21,8 @@ interface Props {
 const STEP = 1.25;
 
 /**
- * The whole tree of the current conversation, full screen. On the left: what it is, the
- * zoom and the logbook. On the right: the tree; a click on a block opens its details, and
+ * The whole tree of the current conversation, full screen. On the left: what it is and the
+ * logbook. On the right: the tree, its zoom bottom right; a click on a block opens its details, and
  * only from there one goes to it. Ways out: "Back to chat" and "Close map" on the left, ×
  * top right, Escape.
  */
@@ -111,27 +111,6 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
           </p>
         </header>
 
-        <div className="map-controls" role="group" aria-label="View">
-          <div className="map-zoom" role="group" aria-label="Zoom">
-            <button type="button" className="btn btn-small" aria-label="Zoom out" onClick={() => zoomBy(1 / STEP)}>
-              −
-            </button>
-            <output className="map-zoom-value" aria-live="polite">
-              {Math.round(view.k * 100)}%
-            </output>
-            <button type="button" className="btn btn-small" aria-label="Zoom in" onClick={() => zoomBy(STEP)}>
-              +
-            </button>
-          </div>
-          <button type="button" className="btn btn-small" onClick={() => fit(layout.width, layout.height, 1)}>
-            Fit
-          </button>
-          <button type="button" className="btn btn-small" onClick={showCurrent} disabled={currentKey === null}>
-            Where I am
-          </button>
-        </div>
-        <p className="map-hint">Drag to move, wheel to zoom. Click a block for its details.</p>
-
         <div className="map-side-scroll">
           <Logbook
             logbook={logbook}
@@ -166,6 +145,29 @@ export function ConversationMap({ state, panelBranchId = null, onJump, onOpenBra
             onSelect={(n) => setSelectedKey((key) => (key === n.key ? null : n.key))}
           />
         )}
+      </div>
+
+      <div className="map-toolbar" role="group" aria-label="View">
+        <p className="map-hint">Drag to move, wheel to zoom, click a block for its details.</p>
+        <div className="map-toolbar-row">
+          <div className="map-zoom" role="group" aria-label="Zoom">
+            <button type="button" className="btn btn-small" aria-label="Zoom out" onClick={() => zoomBy(1 / STEP)}>
+              −
+            </button>
+            <output className="map-zoom-value" aria-live="polite">
+              {Math.round(view.k * 100)}%
+            </output>
+            <button type="button" className="btn btn-small" aria-label="Zoom in" onClick={() => zoomBy(STEP)}>
+              +
+            </button>
+          </div>
+          <button type="button" className="btn btn-small" onClick={() => fit(layout.width, layout.height, 1)}>
+            Fit
+          </button>
+          <button type="button" className="btn btn-small" onClick={showCurrent} disabled={currentKey === null}>
+            Where I am
+          </button>
+        </div>
       </div>
 
       <button type="button" className="icon-btn map-x" aria-label="Close map" onClick={onClose}>
