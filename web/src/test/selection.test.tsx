@@ -283,6 +283,21 @@ describe("findAnchorRoot", () => {
     expect(rangeToSelection(found.root, found.range, content)!.quote).toBe("line two");
   });
 
+  it("clips a triple click that ends at the start of a later block, past UI text", () => {
+    // seen in Edge: triple click on the last line of the last answer ends at <form>, 0
+    const { scope, a } = setup();
+    const content = "first **answer**\nline two";
+    const form = document.createElement("form");
+    form.textContent = "composer";
+    scope.appendChild(form);
+    const r = document.createRange();
+    r.setStart(locate(a, "line two")[0], 0);
+    r.setEnd(form, 0);
+    const found = findAnchorRoot(r, scope)!;
+    expect(found.root).toBe(a);
+    expect(rangeToSelection(found.root, found.range, content)!.quote).toBe("line two");
+  });
+
   it("rejects collapsed ranges and roots outside the scope", () => {
     const { scope, a } = setup();
     const r = rangeBetween(a, "first", "first");

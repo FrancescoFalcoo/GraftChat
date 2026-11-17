@@ -178,7 +178,15 @@ export function findAnchorRoot(
   const clipped = range.cloneRange();
   if (!endRoot) {
     const last = root.childNodes.length;
-    if (!isBlank(doc, root, last, range.endContainer, range.endOffset)) return null;
+    // A triple click on the last line of a message ends the range at offset 0 of the
+    // next block on the page (chips, buttons, the composer...): the range takes no
+    // character from it, even if UI text lies in between, so clip it to the message.
+    const atNextBlockStart =
+      range.endOffset === 0 &&
+      root.compareDocumentPosition(range.endContainer) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (!atNextBlockStart && !isBlank(doc, root, last, range.endContainer, range.endOffset)) {
+      return null;
+    }
     clipped.setEnd(root, last);
   }
   if (!startRoot) {
