@@ -754,7 +754,7 @@ def test_built_frontend_is_served_next_to_the_api(config, service, tmp_path):
     (dist / "index.html").write_text("<!doctype html><title>built app</title>", encoding="utf-8")
     (dist / "assets" / "app.js").write_text("console.log('hi')", encoding="utf-8")
 
-    with_frontend = TestClient(create_app(service, replace(config, web_dist=dist)))
+    with_frontend = TestClient(create_app(service, replace(config, web_dist=dist)), base_url="http://127.0.0.1")
     assert "built app" in with_frontend.get("/").text
     assert with_frontend.get("/assets/app.js").status_code == 200
     assert with_frontend.get("/api/health").json()["ok"] is True

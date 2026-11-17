@@ -99,4 +99,4 @@ def service(config, provider) -> Service:
 
 @pytest.fixture
 def client(service) -> TestClient:
-    return TestClient(create_app(service), raise_server_exceptions=False)
+    return TestClient(create_app(service), base_url="http://127.0.0.1", raise_server_exceptions=False)

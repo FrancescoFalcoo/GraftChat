@@ -10,7 +10,7 @@ import base64
 import binascii
 import logging
 import traceback
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -100,6 +100,36 @@ class MergeRequest(_Body):
     branch_ids: list[int]
 
 
+# The only names this server answers to. It listens on 127.0.0.1, but a web page in the
+# same browser can still reach it: through a domain that resolves to 127.0.0.1 (DNS
+# rebinding, which would let that page read the conversations) or with a cross-site form
+# POST (which could spend the user's credit). The Host and Origin checks below stop both.
+LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _hostname(value: str) -> str | None:
+    """``host[:port]`` or a URL → its host name, lower case; None if unreadable."""
+    try:
+        return urlsplit(value if "//" in value else "//" + value).hostname
+    except ValueError:
+        return None
+
+
+def _local_only_problem(method: str, headers) -> str | None:
+    """Why a request does not come from this computer's own pages, or None if it does."""
+    if _hostname(headers.get("host", "")) not in LOCAL_HOSTS:
+        return "GraftChat only answers at http://127.0.0.1 or http://localhost."
+    if method in _SAFE_METHODS:
+        return None
+    origin = headers.get("origin")
+    if origin is not None and _hostname(origin) not in LOCAL_HOSTS:
+        return "Requests from other websites are refused."
+    if headers.get("sec-fetch-site") == "cross-site":
+        return "Requests from other websites are refused."
+    return None
+
+
 def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse({"error": {"code": code, "message": message}}, status_code=status)
 
@@ -117,6 +147,13 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
     config = config or (service.config if service else load_config())
     service = service or Service(config)
     app = FastAPI(title="GraftChat", docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
+
+    @app.middleware("http")
+    async def _local_only(request: Request, call_next):
+        problem = _local_only_problem(request.method, request.headers)
+        if problem:
+            return _error(403, "not_local", problem)
+        return await call_next(request)
 
     # --- errors, all in the {"error": {"code", "message"}} shape -------------------
 
