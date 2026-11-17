@@ -22,6 +22,8 @@ python -m pytest               # all the tests
 - When a branch comes back, a **merge node** (a message with role `merge`) appears on main
   and the branch stores its id in `merge_message_id`. **Take-away points** are separate
   rows, linked to the branch.
+- A branch also stores its **base** (`base_message_id`): the last message of main when it
+  was opened. It decides which merges the branch knows (§3, DESIGN §14.11).
 
 Every function in `core/` is **pure**: it takes objects, returns new objects and touches
 neither the database nor the network. Ids and timestamps are supplied by the caller. This is
@@ -32,8 +34,9 @@ why they can be tested without any setup.
 | Function | What it does |
 |---|---|
 | `thread` | Puts the messages of one thread in order, following the `parent_id` links. |
-| `open_branch` | Creates an `OPEN` branch on `content[start:end]` of an answer on main. |
+| `open_branch` | Creates an `OPEN` branch on `content[start:end]` of an answer on main, with its base. |
 | `merge_branch` | Returns the branch marked `MERGED` at a merge node (§14.6). |
+| `reusable_merge_node` | The merge node at the end of main a new merge can join, or `None` (§14.11). |
 | `discard_branch` | Returns the branch marked `DISCARDED`. |
 | `pending_branches` | The branches with no decision yet, i.e. the `OPEN` ones. |
 | `check_invariants` | Checks the whole state of a conversation. |
@@ -41,6 +44,28 @@ why they can be tested without any setup.
 A fix made to `merge_branch`: when main was empty, the error message read `main[-1]` and
 Python raised `IndexError` instead of `InvariantError`. The last id is now read only when
 main is not empty.
+
+### `open_branch(anchor, start, end, *, new_id, created_at, base_message_id=None)`
+
+Checks the anchor (an answer of the model, on main) and the offsets, copies the selected
+text into `anchor_quote` and returns an `OPEN` branch. `base_message_id` is the last message
+of main at that moment; the API passes it. `None` means "the anchor", which is how branches
+stored before the field existed behave. Where the base sits on main is checked by
+`check_invariants`, which sees the whole thread: `open_branch` sees only the anchor.
+
+### `reusable_merge_node(messages, branches)`
+
+Branches merged together share one merge node at the end of main (§14.6). This function says
+whether a new merge can join the node that is there:
+
+- main does not end on a merge node → `None` (a new node is needed);
+- some branch has that node as its base → `None`. That branch was opened while the node was
+  the end of main and sees every branch merged there; joining it now would show the branch
+  a merge that happened after it was opened;
+- otherwise → the node.
+
+The API appends a new merge node when it gets `None`, so main may hold two merge nodes in a
+row. For `_render` that is no special case: each node just adds its blocks to `pending`.
 
 ### `pending_branches(branches)`
 
@@ -76,10 +101,11 @@ It runs in four steps, in this order:
      `open_branch`, checked again on the stored state. "Anchor on main" is the depth = 1
      rule;
    - `merge_message_id` is set **if and only if** the branch is `MERGED`;
+   - when `base_message_id` is set: it is a message on main, not before the anchor;
    - if it is `MERGED`: the merge node exists, has role `merge` and is on main; the branch is
-     not empty (§14.2); the merge node comes **after** the anchor on main. The last check
-     uses each message's position in `thread(messages)`: a branch cannot come back before
-     the point it started from.
+     not empty (§14.2); the merge node comes **after** the anchor on main, and after the
+     base when there is one. These checks use each message's position in
+     `thread(messages)`: a branch cannot come back before the point it started from.
 4. `_check_points`: every point's branch exists, whatever its status (§14.9), and no two
    points of the same branch share a `position`.
 
@@ -99,7 +125,10 @@ What it does **not** check, and why:
 Turns the stored tree into the list of messages the model actually receives. It is the piece
 the experiment measures. The result is a `Context` holding a list of
 `ContextMessage(role, content)`, where `role` is `user` or `assistant`. It never produces
-`system` messages (§14.3).
+`system` messages (§14.3). Each `ContextMessage` also has `source_id`, the id of the stored
+message it renders (`None` for a message `_close` writes on its own). It is not part of
+equality: two contexts with the same text are the same input. The API uses it to attach the
+images of that message (DESIGN §14.12); `core` itself knows nothing about images.
 
 ### The two texts the app adds
 
@@ -165,26 +194,51 @@ Ok, what do I do first with the images?
 
 ### `build_branch_context(branch, messages, branches, points)`
 
-Three steps, as in §7:
+Four steps, as in §7:
 
 1. Main from the root up to and **including** the anchor, passed to `_render`. Take-aways
-   merged before the anchor therefore propagate; what happened after the anchor does not.
-2. The anchor note is added to `pending`: it will end up in front of the branch's first user
-   message.
-3. The branch's messages, passed to `_render` with empty lists of branches and points.
+   merged before the anchor therefore propagate.
+2. Main after the anchor, up to and including the **base**: only its merge nodes count, and
+   each adds its blocks to `pending` (`_blocks_merged_at`). The user and assistant messages
+   there are skipped. This is how a branch opened after a merge knows that merge's
+   take-away, even when the merge came after the anchor (DESIGN §14.11). With no base, or a
+   base equal to the anchor, the step does nothing.
+3. The anchor note is added to `pending`, after those blocks: it will end up in front of the
+   branch's first user message, right before what the user typed.
+4. The branch's messages, passed to `_render` with empty lists of branches and points.
+
+Example. Main: a question (1), an answer (2), the merge node (3) of a branch on answer 2.
+A second branch is opened on answer 2 while main ends at 3, so its base is 3. Its first user
+message reaches the model as:
+
+```text
+<context>
+[merged from branch on: «First point.»]
+- Merged fact.
+</context>
+
+<context>
+The user is asking about this specific passage of your previous answer: «Second point.»
+</context>
+
+and this one?
+```
 
 **Isolation between siblings** comes from the construction, not from a filter: the function
-reads only main up to the anchor and the thread of that branch, so the messages of other
-branches have no way in. If the anchor is not on main it raises `InvariantError`.
+reads main up to the base and the thread of that branch, so the messages of other branches
+have no way in, and their take-aways only through merge nodes that existed when the branch
+was opened. Nothing merged later can reach it, because `reusable_merge_node` never lets a
+later merge join a node that is a base. If the anchor is not on main, or the base is not on
+main after the anchor, it raises `InvariantError`.
 
 ## 4. Where the API calls the core
 
 | When | Core function |
 |---|---|
 | every response carrying the conversation state | `thread`, `pending_branches` |
-| the user selects a passage and opens a branch | `open_branch` |
+| the user selects a passage and opens a branch | `thread` (for the base), `open_branch` |
 | the user writes on main / in a branch | `build_main_context` / `build_branch_context` |
-| the user confirms the merge | `merge_branch` (once per branch, on the same merge node) |
+| the user confirms the merge | `reusable_merge_node`, then `merge_branch` (once per branch, on the same merge node) |
 | the user discards a branch | `discard_branch` |
 | before committing any change to the database | `check_invariants` |
 
@@ -212,8 +266,14 @@ though, the branch stays `MERGED`, because it is needed for the history and for 
 experiment (§14.4).
 
 **Can a branch see another branch?**
-Only through a merge that happened before its anchor: in that case it sees the points brought
-back to main, as main sees them. Never the other branch's messages.
+Only through a merge that happened before the branch was opened: then it sees the points
+brought back to main, as main sees them, whether the merge came before or after its anchor.
+Never the other branch's messages, and never a merge made after it was opened.
+
+**Why not let a branch see the whole of main up to its base?**
+The anchor is what the branch is about; what main discussed after it may be another topic
+and would only add noise. A take-away is different: the user chose to bring it back, so it is
+part of what the conversation knows (DESIGN §14.11).
 
 **How much does building a context cost?**
 It is linear in the number of messages, times the number of branches whenever a merge node is

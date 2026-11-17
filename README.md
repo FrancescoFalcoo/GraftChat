@@ -16,7 +16,8 @@ drifts away, the sub-discussions mix, and every tangent stays in the model's con
 
 1. **Chat** normally on a main thread.
 2. **Branch:** select a passage of any answer. A side panel opens a conversation anchored to
-   that passage, isolated from the other branches.
+   that passage, isolated from the other open branches. It already knows the take-aways you
+   merged before opening it, so a second branch on the same answer builds on the first.
 3. **Merge:** back on main, the model writes a take-away of short points for each branch.
    You tick the points that should return to the main context, edit them if you want, and
    discard the branches that led nowhere.
@@ -35,6 +36,9 @@ Ok, what do I do first with the images?
 ```
 
 A branch that is never merged contributes nothing.
+
+You can also attach images to a message (paste, drop or the clip button): they reach models
+that accept images, marked "images" in the model list in Settings.
 
 ## Quick start
 
@@ -70,6 +74,7 @@ GRAFTCHAT_FAKE_LLM=1 python -m api          # PowerShell: $env:GRAFTCHAT_FAKE_LL
   refuses the call once the cap is reached. A cap of 0 means free models only.
 - **Everything is logged locally.** Each model call is stored in a local SQLite database
   with the exact messages that were sent, so what the model saw can always be checked.
+  Attached images are stored in the same database and sent only to OpenRouter.
 
 ## Research question
 
@@ -103,6 +108,7 @@ Documentation:
 - [docs/DESIGN.md](docs/DESIGN.md): the design, its scope and every decision taken along the way.
 - [docs/CORE.md](docs/CORE.md): how the core works, function by function.
 - [docs/API.md](docs/API.md): the HTTP contract between backend and frontend.
+- [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md): proposal for letting other people try it with their own key.
 - [api/README.md](api/README.md) and [web/README.md](web/README.md): notes for each part.
 
 ## Development
@@ -122,7 +128,7 @@ v1 is feature-complete: chat, branches, merge with take-aways, bring-your-own-ke
 and call logging all work end to end. Next comes the experiment.
 
 Out of scope for v1, by design: branches of branches, streaming, several providers, editing
-past messages. The backlog is in [DESIGN.md §10](docs/DESIGN.md#10-v2-backlog).
+past messages, files other than images. The backlog is in [DESIGN.md §10](docs/DESIGN.md#10-v2-backlog).
 
 ## License
 

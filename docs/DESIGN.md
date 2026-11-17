@@ -12,6 +12,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-16 | Added §14.7–§14.10 (what `check_invariants` and `pending_branches` cover, context building details). `api/` and `web/` implemented against [API.md](API.md). |
 | 2026-11-17 | Editorial pass: neutral tone; §9 Ownership written as prose; §4, §8 and §12 aligned with the implementation. |
 | 2026-11-17 | Conversation map added to the v1 scope (§4); the timeline view stays in the backlog. |
+| 2026-11-17 | A branch starts from main as it was when it was opened: it sees the take-aways merged before that moment, even after its anchor (§7, §14.11; `branch.base_message_id` in §6). Images on user messages added to the v1 scope (§4, §6, §14.12). |
 
 ## 1. Problem
 
@@ -44,6 +45,7 @@ In:
 - Normal chat on main (no streaming).
 - Select text in an assistant message → open branch in side panel.
 - Branch chat.
+- Images on user messages (PNG, JPEG, GIF, WebP; up to 4 per message), sent to models that accept them (§14.12).
 - Merge with per-branch take-away, per-point include/exclude.
 - Return-to-main warning.
 - Conversation map: the current conversation drawn as a graph. Main is a vertical trunk with one node per prompt and per merge; each branch leaves the trunk at its anchor in its own colour, with one node per prompt, and merged branches come back into the trunk at their merge node. Nodes are labelled by the first words of the prompt; clicking one shows that prompt.
@@ -54,6 +56,7 @@ In:
 Out (v2 backlog, §10):
 
 - Branches of branches (depth = 1).
+- Files other than images (PDF, text, code).
 - More than one side panel open at a time.
 - Streaming, multiple providers, a timeline view.
 - Editing past messages.
@@ -94,6 +97,17 @@ branch(
   anchor_quote,            -- the selected text, copied (survives re-rendering)
   status,                  -- open | merged | discarded
   merge_message_id NULL,   -- the 'merge' node on main where it was merged
+  created_at,
+  base_message_id NULL     -- last message of main when the branch was opened (§14.11);
+                           -- NULL for branches stored before it existed (= the anchor)
+)
+
+attachment(                -- images of a user message (§14.12); not part of core
+  id, message_id,
+  position,
+  kind,                    -- image
+  mime, name, size,
+  data BLOB,
   created_at
 )
 
@@ -134,10 +148,11 @@ The `anchor_quote` header keeps the "what was this about" link.
 ### Inside a branch
 
 1. Main messages from the root up to and including the anchor message (with any earlier merge nodes, so previously merged take-aways do propagate).
-2. An anchor note, prepended (in explicit delimiters) to the branch's first user message, not sent as a system message (§14): "The user is asking about this specific passage of your previous answer: «<anchor_quote>»".
-3. The branch's own messages.
+2. The merge blocks of the merge nodes between the anchor and the branch's **base**, the last message of main when the branch was opened (§14.11). A take-away merged before the branch existed is known to it, even when the merge came after the anchor: open a branch, merge it, then open a second branch on the same answer, and the second one knows what the first brought back. Only the take-aways cross: the user and assistant messages of main after the anchor stay out.
+3. An anchor note, prepended (in explicit delimiters) to the branch's first user message, not sent as a system message (§14): "The user is asking about this specific passage of your previous answer: «<anchor_quote>»". The blocks of step 2 come before it.
+4. The branch's own messages.
 
-Sibling branches are not visible to each other (isolation).
+Sibling branches that are still open, or that are merged after this branch was opened, are not visible to it (isolation). The branch panel says how many merged take-aways the branch knows, so the rule stays visible.
 
 ## 8. Take-away generation
 
@@ -157,7 +172,8 @@ Claude Code may also review the core code.
 
 ## 10. v2 backlog
 
-- Sequential merge at the graft point: merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows what branch 2 explained). Note: this deliberately breaks sibling isolation. Worth testing as an experimental condition E.
+- Sequential merge at the graft point: merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows what branch 2 explained). Since §14.11 this already holds when branch N is merged *before* branch N+1 is opened; what remains is the case of branches open at the same time, which deliberately breaks sibling isolation. Worth testing as an experimental condition E.
+- Files other than images: PDF (OpenRouter parses them, some engines at a cost), plain text and code (inlined in delimiters, like the merge blocks).
 - Depth > 1.
 - Multiple panels, a timeline view, streaming, more providers (Anthropic, Gemini, Ollama).
 - Trash & restore for discarded branches (DISCARDED → OPEN).
@@ -168,6 +184,7 @@ Claude Code may also review the core code.
 
 - **Scenarios:** 15–20, from real conversations with multi-point answers; each scripted as: main prompt → 2–3 anchored branches → a main follow-up that depends (or should not depend) on branch content.
 - **Conditions:** A–D (§3), all with auto-generated, all-checked take-aways.
+- **Order of operations:** since §14.11 a branch opened after a merge sees that merge's take-away, so each scenario script fixes when every branch is opened and merged.
 - **Metrics:** input tokens; next-answer quality (LLM judge blind to the condition, plus a blind human rating on a subset); contamination.
 - **Output:** results table + 4–6 page technical report (not a paper), with limits stated: small n, LLM-as-judge bias, single provider, author-made scenarios.
 
@@ -213,3 +230,12 @@ Rationale: keeping these rules in core (not in `api/`) makes them unit-testable 
 **14.9** Take-away points may exist on any branch, not only merged ones: they are generated while the user is deciding (the checklist is shown before the merge is confirmed), so they exist on OPEN branches and stay on branches discarded afterwards. This is harmless: main's context uses only the points of MERGED branches. `check_invariants` therefore requires only that a point's branch exists.
 
 **14.10** Context building details (`core/context.py`). Every block the app adds to a user message (a merge block or the anchor note) is wrapped on its own between the delimiters `<context>` and `</context>`, followed by a blank line and then what the user typed. Blocks of several branches merged at the same node are ordered by branch id, so the same state always gives the same context (needed for a reproducible experiment). `render_merge_block` returns the empty string when no point is checked, which is how 14.4 is applied. Blocks that have no user message after them yet (main ends on a merge node; a branch has no message) become a final user message of their own instead of being dropped, so nothing the user chose to bring back is ever hidden from the model.
+
+**14.11** A branch records its **base**: `branch.base_message_id`, the last message of main when it was opened (`open_branch(..., base_message_id=...)`). `build_branch_context` adds the merge blocks of the merge nodes between the anchor and the base, in front of the anchor note. Before this, a branch saw main only up to its anchor, so a second branch opened on the same answer after a merge ignored that merge, contradicting the rationale of 14.5 ("open a new branch on the same passage: it sees main, including the earlier take-aways").
+
+- *Why only the take-aways, not the messages of main after the anchor.* The anchor is what the branch is about; the exchanges that followed it on main may be on other topics. A take-away is different: the user chose to bring it back, so it is part of what the conversation knows.
+- *Why frozen at opening, not "every merge so far".* A branch's context must not change under it: its earlier answers were produced without a later merge, and a sibling open at the same time stays isolated (the backlog item "sequential merge", §10, is the deliberate exception).
+- *Consequence for shared merge nodes.* Branches merged together share the merge node at the end of main (14.6). Once a branch has been opened from that node (it is its base), joining it would make the later merge visible to that branch. `core.tree.reusable_merge_node` therefore returns the node only when no branch has it as base; otherwise the API appends a new merge node, so main can hold two consecutive merge nodes. `check_invariants` checks that a base is on main, not before its anchor, and that a merged branch's merge node comes after its base.
+- *Stored branches.* `base_message_id` is NULL for branches stored before it existed; NULL means "the anchor", which is the old behaviour, so their contexts do not change.
+
+**14.12** Images on user messages. They are stored in an `attachment` table outside `core`: the model input that `core.context` builds stays text, and each `ContextMessage` carries `source_id`, the stored message it renders, so the API can attach that message's images. The same rule as for text applies: an image is sent wherever its message is part of a context (main, and branches whose anchor comes after it). Validation: PNG, JPEG, GIF or WebP recognised by their first bytes, at most 4 per message, 5 MB each. A message with images is refused (`validation`) when the chosen model is known, from OpenRouter's model list, not to accept images; images already in the history are then replaced by a short note in the text, so the call does not fail and the log shows what was left out. The call log stores images as `attachment:<id>` references, not their bytes. The take-away prompt names the images of the branch (`[image attached: <name>]`) but does not send them.
