@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
+import { useFreshIds } from "../hooks/useFreshIds";
 import type { PendingRequest } from "../hooks/useGraft";
 import type { Message } from "../types";
 import { MessageContent } from "./MessageContent";
 
 interface Props {
+  /** What this thread belongs to (conversation or branch): answers new within it fade in. */
+  scope: string;
   messages: Message[];
   /** The model call in flight on this thread, if any. */
   pending: PendingRequest | null;
@@ -25,6 +28,7 @@ export function isAwaitingReply(messages: Message[]): boolean {
 }
 
 export function ThreadView({
+  scope,
   messages,
   pending,
   selectable,
@@ -37,6 +41,10 @@ export function ThreadView({
 }: Props) {
   const dangling = !pending && canRecover && isAwaitingReply(messages);
   const last = messages.at(-1);
+  const freshAnswers = useFreshIds(
+    scope,
+    messages.filter((m) => m.role === "assistant").map((m) => m.id),
+  );
 
   if (messages.length === 0 && !pending) {
     return <div className="thread-empty">{emptyHint}</div>;
@@ -71,7 +79,12 @@ export function ThreadView({
           );
         }
         return (
-          <div key={m.id} className="turn turn-assistant msg msg-assistant" data-turn-id={m.id}>
+          <div
+            key={m.id}
+            className="turn turn-assistant msg msg-assistant"
+            data-turn-id={m.id}
+            data-fresh={freshAnswers.has(m.id) ? "" : undefined}
+          >
             <MessageContent content={m.content} messageId={m.id} selectable={selectable} />
             {renderBelow ? renderBelow(m) : null}
           </div>
@@ -85,7 +98,7 @@ export function ThreadView({
       {pending && (
         <div className="turn turn-assistant turn-thinking thinking" role="status">
           <span className="spinner" aria-hidden="true" />
-          Thinking…
+          <span className="thinking-text">Thinking…</span>
         </div>
       )}
     </div>

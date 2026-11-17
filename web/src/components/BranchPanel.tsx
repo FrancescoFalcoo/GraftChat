@@ -102,6 +102,7 @@ export function BranchPanel({
 
       <div className="panel-scroll" ref={scrollRef}>
         <ThreadView
+          scope={`b${branch.id}`}
           messages={branch.messages}
           pending={pending}
           selectable={false}

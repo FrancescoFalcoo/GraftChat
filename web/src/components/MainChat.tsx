@@ -113,6 +113,7 @@ export function MainChat({
       <div className="chat-scroll" ref={scrollRef}>
         <div className="chat-col" ref={scopeRef}>
           <ThreadView
+            scope={`c${conversationKey ?? ""}`}
             messages={messages}
             pending={pending}
             selectable

@@ -8,8 +8,8 @@ const FRESH_MS = 1200;
  * a merge just applied), for an entrance animation. Ids present when a conversation is
  * loaded are never fresh, so nothing animates on page load or when switching chats.
  */
-export function useFreshIds(scope: number | null, ids: number[]): ReadonlySet<number> {
-  const known = useRef<{ scope: number | null; ids: Set<number> }>({ scope: null, ids: new Set() });
+export function useFreshIds(scope: number | string | null, ids: number[]): ReadonlySet<number> {
+  const known = useRef<{ scope: number | string | null; ids: Set<number> }>({ scope: null, ids: new Set() });
   const [fresh, setFresh] = useState<ReadonlySet<number>>(new Set());
   const key = ids.join(",");
 

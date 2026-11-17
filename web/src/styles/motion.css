@@ -1,0 +1,244 @@
+/*
+ * The micro-interaction layer. Timings and distances follow the motion rules of the
+ * design-taste-frontend skill: hover in 150ms, out 120ms, press 90ms; one UI ease-out,
+ * one settling ease for entrances; transform and opacity only; no bounce on controls.
+ * Under reduced motion everything rests (bottom of the file).
+ */
+:root {
+  --m-in: 150ms;
+  --m-out: 120ms;
+  --m-press: 90ms;
+  --m-panel: 200ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Controls answer the pointer: a 1px step up on hover, a press sinks and shrinks a little. */
+.btn,
+.icon-btn,
+.chip,
+.conv-item,
+.open-branch-btn,
+.map-node,
+.map-branch-label {
+  transition:
+    transform var(--m-out) var(--ease),
+    background-color var(--m-out) var(--ease),
+    border-color var(--m-out) var(--ease),
+    color var(--m-out) var(--ease),
+    box-shadow var(--m-out) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled),
+  .chip:hover,
+  .open-branch-btn:hover {
+    transform: translateY(-1px);
+    transition-duration: var(--m-in);
+  }
+
+  .icon-btn:hover,
+  .conv-item:hover {
+    transition-duration: var(--m-in);
+  }
+
+  .map-node:hover .map-dot {
+    transform: scale(1.3);
+  }
+}
+
+.btn:active:not(:disabled),
+.chip:active,
+.open-branch-btn:active {
+  transform: translateY(1px) scale(0.985);
+  transition-duration: var(--m-press);
+}
+
+.icon-btn:active {
+  transform: scale(0.9);
+  transition-duration: var(--m-press);
+}
+
+.map-dot {
+  transition: transform var(--m-in) var(--ease);
+}
+
+/* The composer lights up as one block when it takes the focus. */
+.composer {
+  transition:
+    border-color 140ms var(--ease),
+    box-shadow 140ms var(--ease);
+}
+
+.composer:focus-within {
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 4px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* A message just sent: the bubble rises into place on the right. */
+.msg-optimistic {
+  animation: bubble-in 260ms var(--ease-enter);
+  transform-origin: right bottom;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* The model is thinking: the word shimmers, like light passing over it. */
+.thinking {
+  animation: fade-up 220ms var(--ease-enter);
+}
+
+.thinking-text {
+  background: linear-gradient(
+      90deg,
+      var(--ink-soft) 0%,
+      var(--ink-soft) 40%,
+      var(--ink) 50%,
+      var(--ink-soft) 60%,
+      var(--ink-soft) 100%
+    )
+    0 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+/* A new answer is revealed top to bottom, as if it were being written. */
+.turn-assistant[data-fresh] {
+  animation: answer-in 650ms var(--ease-enter) both;
+}
+
+@keyframes answer-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    clip-path: inset(0 0 100% -64px); /* the left inset keeps the trunk node visible */
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    clip-path: inset(0 0 -40px -64px);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Dialogs: the backdrop fades in and the dialog settles from just below. */
+.modal-backdrop {
+  animation: fade-in var(--m-panel) var(--ease);
+}
+
+.modal {
+  animation: dialog-in 240ms var(--ease-enter);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+/* The "Open branch" button appears where the selection ends. */
+.open-branch-btn {
+  animation: pop-in 160ms var(--ease-enter);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.94);
+  }
+}
+
+/* Banners and toasts arrive instead of appearing. */
+.return-banner {
+  animation: fade-up 260ms var(--ease-enter);
+}
+
+.toast {
+  animation: toast-in 260ms var(--ease-enter);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+/* Switching conversation: the thread fades in. */
+.chat-scroll > .chat-col {
+  animation: fade-in 200ms var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .icon-btn,
+  .chip,
+  .conv-item,
+  .open-branch-btn,
+  .map-node,
+  .map-branch-label,
+  .map-dot,
+  .composer {
+    transition-property: background-color, border-color, color, box-shadow;
+  }
+
+  .btn:hover:not(:disabled),
+  .btn:active:not(:disabled),
+  .chip:hover,
+  .chip:active,
+  .open-branch-btn:hover,
+  .open-branch-btn:active,
+  .icon-btn:active,
+  .map-node:hover .map-dot {
+    transform: none;
+  }
+
+  .msg-optimistic,
+  .thinking,
+  .turn-assistant[data-fresh],
+  .modal-backdrop,
+  .modal,
+  .open-branch-btn,
+  .return-banner,
+  .toast,
+  .chat-scroll > .chat-col {
+    animation: none;
+  }
+
+  .thinking-text {
+    animation: none;
+    background: none;
+    color: var(--ink-soft);
+  }
+}
