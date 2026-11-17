@@ -99,7 +99,8 @@ set there or in `OPENROUTER_API_KEY` wins over the one saved from the UI.
 ## Privacy and cost
 
 - **Your key stays on your computer.** It is saved in `~/.graftchat/settings.json`, outside
-  this repository, and is sent only to OpenRouter. The server listens on `127.0.0.1` only.
+  this repository, and is sent only to OpenRouter. The server listens on `127.0.0.1` only and refuses requests
+  coming from other websites open in the same browser.
 - **Spend cap.** Before every model call the app adds up what the month has cost so far and
   refuses the call once the cap is reached. A cap of 0 means free models only.
 - **Everything is logged locally.** Each model call is stored in a local SQLite database

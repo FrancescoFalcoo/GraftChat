@@ -12,7 +12,8 @@ agree, contributing data to the experiment (DESIGN §11).
 
 - The app is local: one Python process (`python -m api`) serves the API and the built
   frontend on `127.0.0.1`, with no authentication. That is safe only because nobody else can
-  reach it.
+  reach it: other computers cannot connect, and web pages open in the same browser are
+  refused by the `Host` and `Origin` checks (docs/API.md, `not_local`).
 - The key is BYOK already: pasted in Settings, stored in `~/.graftchat/settings.json`, sent
   only to OpenRouter. The spend cap and the call log are local too.
 - Installing it today needs git, Python 3.11+, Node 20 and four commands. That is fine for a

@@ -29,6 +29,8 @@ a variable already set in the shell wins. To set up and start everything at once
 `python start.py` at the root.
 
 The server binds to `127.0.0.1` only: it has no authentication and it holds the API key.
+It also refuses a foreign `Host` header (DNS rebinding) and a non-GET request coming from
+another website (`Origin`, `Sec-Fetch-Site`), with `403 not_local` (docs/API.md).
 
 ## Files
 

@@ -1,7 +1,12 @@
 # GraftChat HTTP API
 
 Contract between `api/` (FastAPI) and `web/` (React). Everything is JSON under `/api`.
-The server listens on `127.0.0.1` only. Rules and vocabulary come from [DESIGN.md](DESIGN.md).
+The server listens on `127.0.0.1` only, and answers only requests whose `Host` is
+`127.0.0.1`, `localhost` or `::1`; a non-GET request whose `Origin` is another site (or
+whose `Sec-Fetch-Site` is `cross-site`) is refused too. Both answer `403 not_local`: they
+keep a web page open in the same browser from reading the conversations through DNS
+rebinding or from spending credit with a cross-site form. Rules and vocabulary come from
+[DESIGN.md](DESIGN.md).
 
 ## Conventions
 
@@ -16,6 +21,7 @@ The server listens on `127.0.0.1` only. Rules and vocabulary come from [DESIGN.m
 
 | code | status | meaning |
 |---|---|---|
+| `not_local` | 403 | the request does not come from this computer's own pages (foreign `Host`, cross-site `Origin`) |
 | `not_found` | 404 | conversation, branch, message or point does not exist |
 | `validation` | 422 | malformed request (empty content, bad offsets, quote mismatch…) |
 | `invariant` | 409 | a `core.tree` rule refused the operation (`InvariantError`) |
