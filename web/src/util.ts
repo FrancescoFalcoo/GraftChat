@@ -57,3 +57,19 @@ export function pendingBranches(state: ConversationState): Branch[] {
 export function isEmptyConversation(state: ConversationState): boolean {
   return state.main.length === 0 && state.branches.length === 0;
 }
+
+/**
+ * The merged branches whose take-away a branch knows (DESIGN.md §14.11): those merged on
+ * main up to the branch's base (the end of main when it was opened; its anchor for branches
+ * stored before bases existed), with at least one point ticked.
+ */
+export function knownMerges(state: ConversationState, branch: Branch): Branch[] {
+  const position = new Map(state.main.map((m, i) => [m.id, i]));
+  const limit = position.get(branch.base_message_id ?? branch.anchor_message_id);
+  if (limit === undefined) return [];
+  return state.branches.filter((b) => {
+    if (b.id === branch.id || b.status !== "merged" || b.merge_message_id === null) return false;
+    const at = position.get(b.merge_message_id);
+    return at !== undefined && at <= limit && b.points.some((p) => p.included);
+  });
+}

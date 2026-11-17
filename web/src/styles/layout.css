@@ -262,6 +262,13 @@
   text-decoration: line-through;
 }
 
+/* What the branch starts from beyond its passage: take-aways merged before it was opened. */
+.panel-known {
+  margin: var(--space-2) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
 .panel-actions {
   display: flex;
   gap: var(--space-2);

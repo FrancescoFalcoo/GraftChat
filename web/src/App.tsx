@@ -9,7 +9,7 @@ import { SettingsModal } from "./components/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
 import { useGraft } from "./hooks/useGraft";
 import { laneOf } from "./lanes";
-import { pendingBranches } from "./util";
+import { knownMerges, pendingBranches } from "./util";
 
 export function App() {
   const g = useGraft();
@@ -75,6 +75,7 @@ export function App() {
           <BranchPanel
             branch={panelBranch}
             lane={laneOf(state?.branches ?? [], panelBranch.id)}
+            known={state ? knownMerges(state, panelBranch) : []}
             pending={g.pendingFor(panelBranch.id)}
             onClose={g.closePanel}
             onSend={(text) => g.sendMessage(panelBranch.id, text)}

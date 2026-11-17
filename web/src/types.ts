@@ -30,6 +30,8 @@ export interface Branch {
   anchor_quote: string;
   status: BranchStatus;
   merge_message_id: number | null;
+  /** Last message of main when the branch was opened: merges up to it are known to the branch. */
+  base_message_id: number | null;
   created_at: string;
   messages: Message[];
   points: Point[];

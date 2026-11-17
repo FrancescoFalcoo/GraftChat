@@ -11,6 +11,8 @@ interface Props {
   branch: Branch;
   /** Lane colour of the branch (lanes.ts): the rail down the panel's left edge. */
   lane: number;
+  /** Merged branches whose take-aways this branch knows (util.knownMerges). */
+  known: Branch[];
   pending: PendingRequest | null;
   onClose: () => void;
   onSend: (text: string) => Promise<boolean>;
@@ -29,6 +31,7 @@ const STATUS_WORD: Record<Branch["status"], string> = {
 export function BranchPanel({
   branch,
   lane,
+  known,
   pending,
   onClose,
   onSend,
@@ -82,6 +85,15 @@ export function BranchPanel({
         <blockquote className="panel-quote" title={branch.anchor_quote}>
           {plainQuote(branch.anchor_quote)}
         </blockquote>
+        {known.length > 0 && (
+          <p
+            className="panel-known"
+            title={known.map((b) => `«${plainQuote(b.anchor_quote)}»`).join("\n")}
+          >
+            Knows the take-aways of {known.length} merged{" "}
+            {known.length === 1 ? "branch" : "branches"}
+          </p>
+        )}
         {isOpen && (
           <div className="panel-actions">
             <button

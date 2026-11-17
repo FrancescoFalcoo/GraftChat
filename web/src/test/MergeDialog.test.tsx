@@ -20,6 +20,7 @@ function branch(id: number, quote: string, messages: Message[]): Branch {
     anchor_quote: quote,
     status: "open",
     merge_message_id: null,
+    base_message_id: null,
     created_at: NOW,
     messages,
     points: [],

@@ -23,6 +23,7 @@ function baseState(): ConversationState {
         anchor_quote: "First point",
         status: "open",
         merge_message_id: null,
+        base_message_id: null,
         created_at: NOW,
         messages: [],
         points: [],
