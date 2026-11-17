@@ -133,6 +133,12 @@ def test_base_not_on_main_raises():
         build_branch_context(broken, messages, branches, points)
 
 
+def test_context_messages_point_to_their_source():
+    messages, branches, points = scenario()
+    context = build_branch_context(branches[1], messages, branches, points)
+    assert [m.source_id for m in context.messages] == [1, 2, 200]
+
+
 # --- open_branch ------------------------------------------------------------------------
 
 

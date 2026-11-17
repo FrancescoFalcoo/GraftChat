@@ -15,7 +15,7 @@ Decisions applied here (DESIGN.md §14):
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from core.models import Branch, BranchStatus, Message, Role, TakeawayPoint
@@ -39,6 +39,10 @@ class ContextMessage:
 
     role: Literal["system", "user", "assistant"]
     content: str
+    # the stored message this one renders (None for a message the app wrote on its
+    # own, see _close). Lets the API attach that message's images (api/service.py).
+    # Not part of equality: two contexts with the same text are the same input.
+    source_id: int | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
@@ -136,10 +140,10 @@ def _render(
             for block in pending:
                 parts.append(_wrap(block))          #each block between its own delimiters
             parts.append(m.content)                 #then what the user typed
-            out.append(ContextMessage("user", "\n\n".join(parts)))   #parts separated by a blank line
+            out.append(ContextMessage("user", "\n\n".join(parts), m.id))   #parts separated by a blank line
             pending = []                            #used up: they must not appear twice
         else:
-            out.append(ContextMessage("assistant", m.content))     #answers of the model go through unchanged
+            out.append(ContextMessage("assistant", m.content, m.id))     #answers of the model go through unchanged
     return out, pending                             #pending: blocks with no user message after them yet
 
 
