@@ -185,16 +185,21 @@ def build_branch_context(
     In order (§7):
     1. main from the root up to and including the anchor message, with the
        merge blocks of any earlier merge nodes (merged take-aways propagate);
-    2. the anchor note for ``branch.anchor_quote``, prepended to the branch's
-       first user message;
-    3. the branch's own messages.
+    2. the merge blocks of the merge nodes between the anchor and the branch's
+       base, the end of main when it was opened (§14.11): what was merged
+       before the branch existed is known to it, even when the merge came
+       after the anchor. The other messages of main after the anchor are not;
+    3. the anchor note for ``branch.anchor_quote``; the blocks of 2 and 3 are
+       prepended to the branch's first user message;
+    4. the branch's own messages.
 
-    Sibling branches are never visible (isolation).
+    Sibling branches still open, or merged after this branch was opened, are
+    never visible (isolation).
 
     Raises:
         InvariantError: if the branch's anchor message is not on main.
     """
-    #1. main up to and including the anchor: the branch does not see what happened after it
+    #1. main up to and including the anchor: the branch does not see the exchanges after it
     main = thread(messages)                         #main in order
     upto_anchor = []                                #the part of main the branch can see
     found = False
@@ -209,10 +214,24 @@ def build_branch_context(
         )
     out, pending = _render(upto_anchor, branches, points, [])  #take-aways merged before the anchor propagate
 
-    #2. the anchor note waits for the first user message of the branch
+    #2. merges between the anchor and the base: the branch was opened after them (§14.11)
+    if branch.base_message_id is not None and branch.base_message_id != branch.anchor_message_id:
+        reached = False                             #True once the base has been met
+        for m in main[len(upto_anchor):]:           #main after the anchor, in order
+            if m.role == Role.MERGE:                #only the take-aways: the exchanges after the anchor stay out
+                pending.extend(_blocks_merged_at(m, branches, points))
+            if m.id == branch.base_message_id:      #stop at the base, keeping it
+                reached = True
+                break
+        if not reached:                             #the base is not on main after the anchor: corrupt branch
+            raise InvariantError(
+                f"base message {branch.base_message_id} of branch {branch.id} is not on main after its anchor"
+            )
+
+    #3. the anchor note waits for the first user message of the branch, after the merged blocks
     pending.append(render_anchor_note(branch.anchor_quote))
 
-    #3. the branch's own messages. No branches or points needed here: a branch has
+    #4. the branch's own messages. No branches or points needed here: a branch has
     #   no merge nodes, and siblings must not be visible (isolation)
     own = thread(messages, branch.id)               #this branch only, in order
     own_out, pending = _render(own, [], [], pending)

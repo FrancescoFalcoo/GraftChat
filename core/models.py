@@ -80,6 +80,10 @@ class Branch:
     status: BranchStatus
     merge_message_id: int | None  # the 'merge' node on main where it was merged
     created_at: datetime
+    # last message of main when the branch was opened (§14.11): take-aways merged
+    # up to here are visible in the branch. None = the anchor (branches stored
+    # before this field existed see main up to their anchor only).
+    base_message_id: int | None = None
 
 
 @dataclass

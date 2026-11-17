@@ -69,11 +69,24 @@ def thread(messages: Sequence[Message], branch_id: int | None = None) -> list[Me
     return walk                                 #messages ordered from the root to the current end
 
 
-def open_branch(anchor: Message, start: int, end: int, *, new_id: int, created_at: datetime,) -> Branch:
+def open_branch(
+    anchor: Message,
+    start: int,
+    end: int,
+    *,
+    new_id: int,
+    created_at: datetime,
+    base_message_id: int | None = None,
+) -> Branch:
     """Create an open branch anchored to ``anchor.content[start:end]``.
 
     The selected text is copied into ``anchor_quote``. Per DESIGN.md the anchor
     must be an assistant message on main (depth = 1, no branches of branches).
+
+    ``base_message_id`` is the last message of main at this moment (§14.11): the
+    branch will see the take-aways merged up to there, even after its anchor.
+    ``None`` means the anchor itself. Where it sits on main is checked by
+    ``check_invariants``, which sees the whole thread.
 
     Raises:
         InvariantError: if the anchor or the offsets are not valid.
@@ -97,8 +110,27 @@ def open_branch(anchor: Message, start: int, end: int, *, new_id: int, created_a
         anchor_quote= anchor.content[start:end],    #copy of the selected text: it survives re-rendering
         status= BranchStatus.OPEN,                  #every branch starts open (§14.5)
         merge_message_id= None,                     #not merged yet
-        created_at= created_at                      #timestamp chosen by the caller
+        created_at= created_at,                     #timestamp chosen by the caller
+        base_message_id= base_message_id,           #end of main right now: merges up to here are visible (§14.11)
     )
+
+
+def reusable_merge_node(messages: Sequence[Message], branches: Sequence[Branch]) -> Message | None:
+    """The merge node a new merge can join, or None if a new node is needed (§14.11).
+
+    Branches merged together share the merge node at the end of main (§14.6).
+    That node can no longer be joined once a branch has been opened from it
+    (its ``base_message_id``): that branch sees every branch merged there, so a
+    later merge into the same node would leak into a branch opened before it.
+    """
+    main = thread(messages)                         #main in order
+    if not main or main[-1].role != Role.MERGE:
+        return None                                 #main does not end on a merge node: a new one is needed
+    node = main[-1]
+    for b in branches:
+        if b.base_message_id == node.id:            #a branch was opened while this node was the end of main
+            return None                             #joining it now would change what that branch sees
+    return node
 
 
 def merge_branch(branch: Branch, merge_message: Message, messages: Sequence[Message]) -> Branch:
@@ -186,7 +218,9 @@ def check_invariants(
       offsets are inside it and ``anchor_quote`` is the selected text;
     - ``merge_message_id`` is set if and only if the branch is MERGED;
     - a merged branch points to a ``merge`` node on main, is not empty (§14.2),
-      and its merge node comes after its anchor.
+      and its merge node comes after its anchor;
+    - when set, ``base_message_id`` is on main, not before the anchor, and a
+      merged branch's merge node comes after it (§14.11).
 
     Take-away points:
     - ids are unique, and a point's branch exists, whatever its status (§14.9);
@@ -267,6 +301,13 @@ def _check_branches(messages: Sequence[Message], branches: Sequence[Branch]) -> 
         if anchor.content[b.anchor_start:b.anchor_end] != b.anchor_quote:      #the copy must match the selected text
             raise InvariantError(f"branch {b.id}: anchor_quote is not the selected text of message {anchor.id}")
 
+        #--- base: the end of main when the branch was opened (§14.11)
+        if b.base_message_id is not None:
+            if b.base_message_id not in position:   #it must be a message on main
+                raise InvariantError(f"branch {b.id}: base message {b.base_message_id} is not on main")
+            if position[b.base_message_id] < position[anchor.id]:   #main had reached the anchor when the branch opened
+                raise InvariantError(f"branch {b.id}: base message {b.base_message_id} comes before its anchor {anchor.id}")
+
         #--- status and merge node go together: MERGED <=> merge_message_id is set
         if b.status != BranchStatus.MERGED:
             if b.merge_message_id is not None:      #open or discarded, but pointing to a merge node
@@ -285,6 +326,9 @@ def _check_branches(messages: Sequence[Message], branches: Sequence[Branch]) -> 
         #a branch cannot come back into main before the point it started from
         if position[node.id] <= position[anchor.id]:
             raise InvariantError(f"branch {b.id}: merge node {node.id} comes before its anchor {anchor.id}")
+        #nor at a node that already existed when it was opened (§14.11)
+        if b.base_message_id is not None and position[node.id] <= position[b.base_message_id]:
+            raise InvariantError(f"branch {b.id}: merge node {node.id} is not after its base {b.base_message_id}")
 
 
 def _check_points(branches: Sequence[Branch], points: Sequence[TakeawayPoint]) -> None:
