@@ -14,6 +14,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-17 | Conversation map added to the v1 scope (§4); the timeline view stays in the backlog. |
 | 2026-11-17 | A branch starts from main as it was when it was opened: it sees the take-aways merged before that moment, even after its anchor (§7, §14.11; `branch.base_message_id` in §6). Images on user messages added to the v1 scope (§4, §6, §14.12). |
 | 2026-11-17 | Documents on user messages (PDF, Word, plain text and code), read to text locally (§4, §6, §14.13). |
+| 2026-11-17 | Take-away points written by hand in the merge checklist (§5, §6, §14.14). |
 
 ## 1. Problem
 
@@ -73,7 +74,8 @@ Out (v2 backlog, §10):
 5. **Merge** (any time, while on main): for each pending branch, the LLM generates a take-away. The merge panel shows, per branch, a checklist:
    - each row = one point: short title (e.g. "added X", "solved Y", "noted Z") + checkbox;
    - a ▾ chevron expands the row to show the text that will actually enter the context;
-   - the text is editable. Branches can be merged or discarded independently.
+   - the text and the title are editable;
+   - the user can add points of their own: something the take-away missed, a different wording, or any text they want in the main context (§14.14). Branches can be merged or discarded independently.
 6. **Main continues;** the next model call includes the checked points (§7).
 
 Rule: a branch that is never merged is excluded from main's context. No hidden state: what the model sees is always exactly the checked point texts.
@@ -120,7 +122,8 @@ takeaway_point(
   title,                   -- short label shown in the checklist
   text_generated,          -- what the LLM wrote (never overwritten)
   text_final,              -- what enters the context (= generated unless edited)
-  included BOOLEAN         -- checkbox
+  included BOOLEAN,        -- checkbox
+  origin                   -- model | user (added by hand; text_generated = '')
 )
 
 llm_call_log(
@@ -132,7 +135,7 @@ llm_call_log(
 )
 ```
 
-Why keep `text_generated` and `text_final` apart: the experiment must measure the system (auto take-away), not the user's ability to rewrite it.
+Why keep `text_generated` and `text_final` apart: the experiment must measure the system (auto take-away), not the user's ability to rewrite it. For the same reason a point added by hand is marked `origin = user`.
 
 ## 7. Context construction
 
@@ -246,3 +249,7 @@ Rationale: keeping these rules in core (not in `api/`) makes them unit-testable 
 **14.13** Documents on user messages: PDF (read with `pypdf`, page by page, marked `[page N]`), Word `.docx` (paragraph text from `word/document.xml`, standard library only) and plain text or source code (by extension, decoded as UTF-8 or UTF-16 with a BOM). Each is read to text **on this computer when it is attached** (`api/documents.py`); the original file is kept to be downloaded again. The model receives the text after what the user typed, one block per document between `<document name="…">` and `</document>`, wherever the message is part of a context, exactly like an image (14.12). Limits: 10 MB per file, 200,000 characters of text, 6 files per message (images included).
 
 Rationale: OpenRouter can parse PDFs itself, but then the model reads a text the app never sees, and some parsing engines are charged. Extracting locally keeps "no hidden state": the call log holds exactly the text the model read, it costs nothing, and it works with every model, including text-only ones. The price is that a scanned PDF has no text to read; it is refused with a message that suggests sending its pages as images. A document is only ever downloaded, never shown inline, so an `.html` file cannot run in the app's page.
+
+**14.14** The user can add take-away points by hand, in the merge checklist, while the branch is open. Such a point has `origin = user` and `text_generated = ''` (nothing was generated); it is included by default and enters the context exactly like a generated one, through `text_final`, so `core.context` needs no change. Its title is the one the user gives or the first five words of its text. A point the user added can be deleted; a generated point can only be unticked (its text stays as the record of what the model wrote, 14.7). Regenerating replaces only the generated points: the user's stay, after the new ones. A branch whose points were all written by hand can be merged without generating a take-away.
+
+Rationale: the checklist is the only door from a branch to main. If the model misses something, or the user wants it in other words, or wants to put any text at all in front of the next message (a deliberate injection of context), that text should go through the same visible, delimited block rather than be typed into the next message by hand. `origin` keeps the experiment honest: condition C (§3) is measured on generated points only.

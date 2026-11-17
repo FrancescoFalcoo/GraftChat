@@ -67,6 +67,7 @@ interface Point {
   text_generated: string;     // never changes
   text_final: string;         // what enters the context
   included: boolean;
+  origin: "model" | "user";   // "user": added by hand (text_generated is "")
 }
 
 interface Branch {
@@ -206,7 +207,9 @@ The call log contains these blocks in full: they are exactly what the model read
 | POST | `/api/conversations/{id}/branches` | `{ anchor_message_id, start, end, quote }` | `{ branch_id: number, state: ConversationState }` (201) |
 | POST | `/api/branches/{id}/discard` | – | `ConversationState` |
 | POST | `/api/branches/{id}/takeaway` | `{ regenerate?: boolean }` | `ConversationState` |
-| PATCH | `/api/points/{id}` | any subset of `{ included: boolean, text_final: string }` | `ConversationState` |
+| PATCH | `/api/points/{id}` | any subset of `{ included: boolean, text_final: string, title: string }` | `ConversationState` |
+| POST | `/api/branches/{id}/points` | `{ text: string, title?: string }` | `ConversationState` (201) |
+| DELETE | `/api/points/{id}` | – | `ConversationState` |
 | POST | `/api/conversations/{id}/merge` | `{ branch_ids: number[] }` | `ConversationState` |
 
 - **Open**: `quote` is the selected text as the frontend sees it; the server checks it
@@ -218,9 +221,14 @@ The call log contains these blocks in full: they are exactly what the model read
   all `included: true`.
 - **Points**: can only be changed while their branch is open. `text_final` must not be
   blank. `text_generated` cannot be changed.
+- **Points by hand**: `POST …/points` appends a point with `origin: "user"`, included, at the
+  end of the checklist; `title` defaults to the first five words of `text`. Only on an open,
+  non-empty branch. `DELETE /api/points/{id}` removes a point with `origin: "user"` only
+  (`conflict` for a generated one: untick it). Regenerating keeps the user's points, after the
+  new ones. A branch can be merged when it has any point, generated or written by hand.
 - **Merge**: merges the listed branches at the current end of main. Each must be open,
-  non-empty and have a generated take-away (`conflict` otherwise); main must not be
-  awaiting a reply. The server appends one `merge` message to main (or reuses the last
+  non-empty and have at least one point, generated or written by hand (`conflict`
+  otherwise); main must not be awaiting a reply. The server appends one `merge` message to main (or reuses the last
   message of main if it is already a merge node and no branch was opened from it since,
   `core.tree.reusable_merge_node`) and marks the branches as merged there. Zero checked
   points is valid (DESIGN §14.4).
