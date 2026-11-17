@@ -1,225 +1,224 @@
-# Come funziona `core/`
+# How `core/` works
 
-Guida di studio al codice di `core/`: cosa fa ogni funzione, perché è fatta così e dove
-viene usata. Le regole vengono da [DESIGN.md](DESIGN.md) (soprattutto §6, §7 e §14); qui
-c'è il ragionamento che le collega al codice.
+A study guide to the code in `core/`: what each function does, why it is built that way and
+where it is used. The rules come from [DESIGN.md](DESIGN.md) (mainly §6, §7 and §14); this
+document holds the reasoning that connects them to the code.
 
-Per vedere tutto in azione su una conversazione di esempio:
+To see everything at work on a sample conversation:
 
 ```bash
-python devtools/preview.py     # chiama ogni funzione del core e stampa il risultato
-python -m pytest               # tutti i test
+python devtools/preview.py     # calls every core function and prints the result
+python -m pytest               # all the tests
 ```
 
-## 1. Il modello in quattro frasi
+## 1. The model in four sentences
 
-- Un **messaggio** conosce solo il messaggio che lo precede nello stesso thread
-  (`parent_id`). Un thread è quindi una catena: radice → figlio → figlio.
-- Il **main** è il thread con `branch_id = None`. Ogni **branch** è un altro thread, con il
-  suo `branch_id`. Il primo messaggio di ogni thread ha `parent_id = None` (§14.1).
-- Un branch è agganciato al main da un solo dato: `anchor_message_id`, più gli offset del
-  passaggio selezionato. Nei messaggi del branch non c'è nessun riferimento al main.
-- Quando un branch rientra, sul main compare un **merge node** (un messaggio con ruolo
-  `merge`) e il branch ne salva l'id in `merge_message_id`. I **take-away point** sono
-  righe separate, legate al branch.
+- A **message** knows only the message before it in the same thread (`parent_id`). A thread
+  is therefore a chain: root → child → child.
+- **Main** is the thread with `branch_id = None`. Each **branch** is another thread, with its
+  own `branch_id`. The first message of every thread has `parent_id = None` (§14.1).
+- A branch is attached to main by a single piece of data: `anchor_message_id`, plus the
+  offsets of the selected passage. The branch's messages hold no reference to main.
+- When a branch comes back, a **merge node** (a message with role `merge`) appears on main
+  and the branch stores its id in `merge_message_id`. **Take-away points** are separate
+  rows, linked to the branch.
 
-Tutte le funzioni di `core/` sono **pure**: ricevono oggetti, restituiscono oggetti nuovi,
-non toccano database né rete. Gli id e le date li passa chi chiama. Per questo si testano
-senza preparare niente.
+Every function in `core/` is **pure**: it takes objects, returns new objects and touches
+neither the database nor the network. Ids and timestamps are supplied by the caller. This is
+why they can be tested without any setup.
 
 ## 2. `core/tree.py`
 
-| funzione | cosa fa |
+| Function | What it does |
 |---|---|
-| `thread` | Rimette in ordine i messaggi di un thread seguendo i `parent_id`. |
-| `open_branch` | Crea un branch `OPEN` su `content[start:end]` di una risposta del main. |
-| `merge_branch` | Restituisce il branch marcato `MERGED` su un merge node (§14.6). |
-| `discard_branch` | Restituisce il branch marcato `DISCARDED`. |
-| `pending_branches` | I branch senza decisione, cioè quelli `OPEN`. |
-| `check_invariants` | Controlla l'intero stato di una conversazione. |
+| `thread` | Puts the messages of one thread in order, following the `parent_id` links. |
+| `open_branch` | Creates an `OPEN` branch on `content[start:end]` of an answer on main. |
+| `merge_branch` | Returns the branch marked `MERGED` at a merge node (§14.6). |
+| `discard_branch` | Returns the branch marked `DISCARDED`. |
+| `pending_branches` | The branches with no decision yet, i.e. the `OPEN` ones. |
+| `check_invariants` | Checks the whole state of a conversation. |
 
-Una correzione fatta a `merge_branch`: se il main era vuoto, il messaggio d'errore leggeva
-`main[-1]` e Python lanciava `IndexError` invece di `InvariantError`. Ora l'ultimo id si
-legge solo se il main non è vuoto.
+A fix made to `merge_branch`: when main was empty, the error message read `main[-1]` and
+Python raised `IndexError` instead of `InvariantError`. The last id is now read only when
+main is not empty.
 
 ### `pending_branches(branches)`
 
-Scorre i branch e tiene quelli con `status == OPEN`, nell'ordine in cui arrivano. Con la
-macchina a stati di §14.5 (`OPEN → MERGED`, `OPEN → DISCARDED`, entrambi finali) "nessuna
-decisione presa" e "`OPEN`" sono la stessa cosa. I branch vuoti sono inclusi (§14.8): sono
-comunque una decisione in sospeso, anche se l'unica scelta possibile è scartarli.
+Goes through the branches and keeps those with `status == OPEN`, in the order they arrive.
+With the state machine of §14.5 (`OPEN → MERGED`, `OPEN → DISCARDED`, both final), "no
+decision taken" and "`OPEN`" mean the same thing. Empty branches are included (§14.8): they
+are still a pending decision, even if the only possible choice is to discard them.
 
-La usa l'API per dire al frontend quanti branch mostrare nel banner "You came back from N
-branches. Merge?".
+The API uses it to tell the frontend how many branches to count in the banner "You came back
+from N branches. Merge?".
 
 ### `check_invariants(messages, branches, points)`
 
-Le altre funzioni controllano **un'operazione**. Questa controlla **tutto quello che è
-salvato**: l'API la chiama prima di confermare ogni modifica, e se trova una violazione la
-modifica viene annullata. Non restituisce niente; lancia `InvariantError` alla prima
-violazione.
+The other functions check **one operation**. This one checks **everything that is stored**:
+the API calls it before committing every change, and if it finds a violation the change is
+rolled back. It returns nothing; it raises `InvariantError` at the first violation.
 
-È divisa in quattro passi, in quest'ordine:
+It runs in four steps, in this order:
 
-1. `_check_unique_ids`: nessun id ripetuto tra i messaggi, tra i branch, tra i punti.
-   Va per primo perché gli altri controlli costruiscono dizionari per id, e un dizionario
-   sovrascrive in silenzio un doppione.
+1. `_check_unique_ids`: no repeated id among messages, among branches, among points. It
+   comes first because the other checks build dictionaries keyed by id, and a dictionary
+   silently overwrites a duplicate.
 2. `_check_messages`:
-   - tutto appartiene a una sola conversazione;
-   - il `branch_id` di ogni messaggio esiste. Un messaggio "orfano" non verrebbe mai
-     trovato da `thread`, perché nessuno chiede quel branch;
-   - i merge node stanno solo sul main;
-   - il main e ogni branch sono una catena sola: basta chiamare `thread`, che già lancia
-     errore se trova due radici, un bivio o un messaggio irraggiungibile.
-3. `_check_branches`, per ogni branch:
-   - l'anchor esiste, è sul main, è una risposta del modello, gli offset sono dentro il
-     testo e `anchor_quote` è proprio `content[start:end]`. Sono le stesse regole di
-     `open_branch`, ricontrollate sullo stato salvato. "Anchor sul main" è la regola
-     profondità = 1;
-   - `merge_message_id` c'è **se e solo se** il branch è `MERGED`;
-   - se è `MERGED`: il merge node esiste, ha ruolo `merge`, è sul main; il branch non è
-     vuoto (§14.2); il merge node viene **dopo** l'anchor nel main. L'ultimo controllo usa
-     la posizione di ogni messaggio in `thread(messages)`: un branch non può rientrare
-     prima del punto da cui è partito.
-4. `_check_points`: il branch di ogni punto esiste, in qualunque stato sia (§14.9), e due
-   punti dello stesso branch non hanno la stessa `position`.
+   - everything belongs to a single conversation;
+   - every message's `branch_id` exists. An "orphan" message would never be found by
+     `thread`, because nobody asks for that branch;
+   - merge nodes live on main only;
+   - main and every branch are a single chain: calling `thread` is enough, since it already
+     raises an error on two roots, a fork or an unreachable message.
+3. `_check_branches`, for every branch:
+   - the anchor exists, is on main, is an answer of the model, the offsets are inside the
+     text and `anchor_quote` is exactly `content[start:end]`. These are the same rules as
+     `open_branch`, checked again on the stored state. "Anchor on main" is the depth = 1
+     rule;
+   - `merge_message_id` is set **if and only if** the branch is `MERGED`;
+   - if it is `MERGED`: the merge node exists, has role `merge` and is on main; the branch is
+     not empty (§14.2); the merge node comes **after** the anchor on main. The last check
+     uses each message's position in `thread(messages)`: a branch cannot come back before
+     the point it started from.
+4. `_check_points`: every point's branch exists, whatever its status (§14.9), and no two
+   points of the same branch share a `position`.
 
-Cosa **non** controlla, e perché:
+What it does **not** check, and why:
 
-- "`text_generated` non viene mai sovrascritto" (§14.7). La funzione vede una fotografia
-  dello stato: non può sapere cosa c'era prima. La regola si applica dove si modifica un
-  punto: l'API può scrivere solo `included` e `text_final`.
-- "Da 1 a 6 punti" e "titoli di al massimo 5 parole" (§8). Sono richieste al modello che
-  genera i take-away, non proprietà dei dati: le applica `api/takeaway.py`.
-- Che il merge node sia la fine del main. Vale solo nel momento del merge
-  (`merge_branch`); dopo, il main continua.
+- "`text_generated` is never overwritten" (§14.7). The function sees a snapshot of the
+  state: it cannot know what was there before. The rule is enforced where a point is
+  edited: the API can write only `included` and `text_final`.
+- "From 1 to 6 points" and "titles of at most 5 words" (§8). These are requests made to the
+  model that generates the take-aways, not properties of the data: `api/takeaway.py`
+  enforces them.
+- That the merge node is the end of main. That holds only at the moment of the merge
+  (`merge_branch`); afterwards, main goes on.
 
 ## 3. `core/context.py`
 
-Trasforma l'albero salvato nell'elenco di messaggi che il modello riceve davvero. È il
-pezzo che l'esperimento misura. Il risultato è un `Context` con una lista di
-`ContextMessage(role, content)`, dove `role` è `user` o `assistant`. Non produce mai
-messaggi `system` (§14.3).
+Turns the stored tree into the list of messages the model actually receives. It is the piece
+the experiment measures. The result is a `Context` holding a list of
+`ContextMessage(role, content)`, where `role` is `user` or `assistant`. It never produces
+`system` messages (§14.3).
 
-### I due testi che l'app aggiunge
+### The two texts the app adds
 
-`render_merge_block(anchor_quote, points)` scrive il blocco di un branch mergiato:
+`render_merge_block(anchor_quote, points)` writes the block of a merged branch:
 
+```text
+[merged from branch on: «Compress the images and serve them as WebP or AVIF»]
+- Use AVIF for photos: at the same quality it is smaller than WebP.
+- Fall back to WebP with <picture> for browsers without AVIF.
 ```
-[merged from branch on: «Comprimi le immagini e servile in WebP o AVIF»]
-- Usa AVIF per le foto: a parità di qualità pesa meno di WebP.
-- Fallback WebP via <picture> per i browser senza AVIF.
-```
 
-Entrano solo i punti con `included = True`, ordinati per `position`, con il testo
-`text_final` (quello eventualmente modificato dall'utente). Se nessun punto è spuntato
-restituisce la stringa vuota: è così che un merge senza punti "non inietta niente" (§14.4).
+Only points with `included = True` appear, ordered by `position`, with their `text_final`
+(the text as possibly edited by the user). When no point is checked it returns the empty
+string: this is how a merge with no points "injects nothing" (§14.4).
 
-`render_anchor_note(anchor_quote)` scrive la frase che dice al modello di quale passaggio
-parla il branch.
+`render_anchor_note(anchor_quote)` writes the sentence that tells the model which passage
+the branch is about.
 
-### L'idea centrale: i blocchi in attesa
+### The central idea: waiting blocks
 
-Un merge node non è un messaggio per il modello. È un punto del main in cui "arrivano" dei
-blocchi. Quei blocchi vanno messi **in testa al messaggio utente successivo**, ciascuno tra
-i delimitatori `<context>` e `</context>` (§14.3, §14.10).
+A merge node is not a message for the model. It is a point on main where blocks "arrive".
+Those blocks go **in front of the next user message**, each between the delimiters
+`<context>` and `</context>` (§14.3, §14.10).
 
-`_render` fa esattamente questo, scorrendo un thread già ordinato con una lista `pending`
-di blocchi in attesa:
+`_render` does exactly this, walking a thread already in order with a `pending` list of
+waiting blocks:
 
-| messaggio incontrato | cosa succede |
+| Message met | What happens |
 |---|---|
-| ruolo `merge` | i blocchi dei branch mergiati in quel nodo si aggiungono a `pending` |
-| ruolo `user` | esce un messaggio `user` = blocchi in attesa + testo dell'utente; `pending` si svuota |
-| ruolo `assistant` | esce un messaggio `assistant` uguale all'originale |
+| role `merge` | the blocks of the branches merged at that node are added to `pending` |
+| role `user` | a `user` message goes out = waiting blocks + the user's text; `pending` is emptied |
+| role `assistant` | an `assistant` message goes out, identical to the original |
 
-Svuotare `pending` dopo l'uso è ciò che garantisce che un blocco compaia una volta sola.
+Emptying `pending` after use is what guarantees that a block appears only once.
 
-`_blocks_merged_at` sceglie i branch di un nodo: devono essere `MERGED` e avere
-`merge_message_id` uguale all'id del nodo. Li scorre in ordine di id, così lo stesso stato
-produce sempre lo stesso testo (serve per ripetere l'esperimento).
+`_blocks_merged_at` picks the branches of a node: they must be `MERGED` and have a
+`merge_message_id` equal to the node's id. It goes through them in id order, so the same
+state always produces the same text (needed to repeat the experiment).
 
-`_close` gestisce il caso limite: se alla fine restano blocchi senza un messaggio utente
-dopo (il main finisce su un merge node, oppure il branch è vuoto), diventano un ultimo
-messaggio `user` a sé. Buttarli via nasconderebbe al modello qualcosa che l'utente ha
-scelto di riportare.
+`_close` handles the edge case: if blocks are left at the end with no user message after
+them (main ends on a merge node, or the branch is empty), they become a last `user` message
+of their own. Dropping them would hide from the model something the user chose to bring
+back.
 
 ### `build_main_context(messages, branches, points)`
 
-Prende `thread(messages)`, cioè solo il main, e lo passa a `_render`. I messaggi dei branch
-non entrano mai: di un branch arriva al main soltanto il blocco dei punti spuntati. I branch
-`OPEN` e `DISCARDED` non contribuiscono.
+Takes `thread(messages)`, i.e. main only, and passes it to `_render`. Branch messages never
+enter: all that reaches main from a branch is the block of its checked points. `OPEN` and
+`DISCARDED` branches contribute nothing.
 
-Esempio (è quello di `devtools/preview.py`). Main: domanda, risposta, merge node del branch
-1, nuova domanda. Il modello riceve tre messaggi, e l'ultimo è:
+Example. Main: a question, an answer, the merge node of branch 1, a new question. The model
+receives three messages, and the last one is:
 
-```
+```text
 <context>
-[merged from branch on: «Comprimi le immagini e servile in WebP o AVIF»]
-- Usa AVIF per le foto: a parità di qualità pesa meno di WebP.
-- Fallback WebP via <picture> per i browser senza AVIF.
+[merged from branch on: «Compress the images and serve them as WebP or AVIF»]
+- Use AVIF for photos: at the same quality it is smaller than WebP.
+- Fall back to WebP with <picture> for browsers without AVIF.
 </context>
 
-Ok, cosa faccio per prima cosa con le immagini?
+Ok, what do I do first with the images?
 ```
 
 ### `build_branch_context(branch, messages, branches, points)`
 
-Tre passi, come in §7:
+Three steps, as in §7:
 
-1. Il main dalla radice fino all'anchor **compreso**, passato a `_render`. I take-away
-   mergiati prima dell'anchor quindi si propagano; quello che è successo dopo l'anchor no.
-2. La nota sull'anchor viene aggiunta a `pending`: finirà in testa al primo messaggio
-   utente del branch.
-3. I messaggi del branch, passati a `_render` con liste vuote di branch e punti.
+1. Main from the root up to and **including** the anchor, passed to `_render`. Take-aways
+   merged before the anchor therefore propagate; what happened after the anchor does not.
+2. The anchor note is added to `pending`: it will end up in front of the branch's first user
+   message.
+3. The branch's messages, passed to `_render` with empty lists of branches and points.
 
-L'**isolamento tra fratelli** viene dalla costruzione, non da un filtro: la funzione legge
-solo il main fino all'anchor e il thread di quel branch, quindi i messaggi degli altri
-branch non hanno modo di entrare. Se l'anchor non è sul main lancia `InvariantError`.
+**Isolation between siblings** comes from the construction, not from a filter: the function
+reads only main up to the anchor and the thread of that branch, so the messages of other
+branches have no way in. If the anchor is not on main it raises `InvariantError`.
 
-## 4. Dove l'API chiama il core
+## 4. Where the API calls the core
 
-| quando | funzione del core |
+| When | Core function |
 |---|---|
-| ogni risposta con lo stato della conversazione | `thread`, `pending_branches` |
-| l'utente seleziona un passaggio e apre un branch | `open_branch` |
-| l'utente scrive sul main / in un branch | `build_main_context` / `build_branch_context` |
-| l'utente conferma il merge | `merge_branch` (una volta per branch, sullo stesso merge node) |
-| l'utente scarta un branch | `discard_branch` |
-| prima di confermare ogni modifica nel database | `check_invariants` |
+| every response carrying the conversation state | `thread`, `pending_branches` |
+| the user selects a passage and opens a branch | `open_branch` |
+| the user writes on main / in a branch | `build_main_context` / `build_branch_context` |
+| the user confirms the merge | `merge_branch` (once per branch, on the same merge node) |
+| the user discards a branch | `discard_branch` |
+| before committing any change to the database | `check_invariants` |
 
-Il codice è in [api/service.py](../api/service.py): carica lo stato da SQLite, chiama il
-core, chiama il modello, salva il risultato. Non decide nessuna regola.
+The code is in [api/service.py](../api/service.py): it loads the state from SQLite, calls the
+core, calls the model and stores the result. It decides no rule.
 
-## 5. Domande che è facile ricevere
+## 5. Questions you are likely to get
 
-**Perché il primo messaggio di un branch ha `parent_id = None` e non l'anchor?**
-Perché `parent_id` significa sempre "messaggio precedente nello stesso thread". Così
-`thread` tratta main e branch allo stesso modo, senza casi speciali (§14.1).
+**Why does the first message of a branch have `parent_id = None` and not the anchor?**
+Because `parent_id` always means "previous message in the same thread". This way `thread`
+treats main and branches the same way, with no special cases (§14.1).
 
-**Perché i blocchi stanno dentro un messaggio utente e non in un messaggio `system`?**
-Alcuni provider accettano il system prompt solo come parametro separato, e i messaggi
-`system` a metà conversazione si comportano in modo diverso da un provider all'altro. Un
-blocco delimitato dentro il messaggio utente funziona ovunque (§14.3).
+**Why do the blocks go inside a user message and not in a `system` message?**
+Some providers accept the system prompt only as a separate parameter, and `system` messages
+in the middle of a conversation behave differently from one provider to another. A delimited
+block inside the user message works everywhere (§14.3).
 
-**Perché `merge_branch` riceve tutti i messaggi?**
-Per controllare dentro il core due regole che altrimenti finirebbero nell'API: un branch
-vuoto non si mergia, e il merge node dev'essere la fine del main (§14.6).
+**Why does `merge_branch` receive all the messages?**
+To check inside the core two rules that would otherwise end up in the API: an empty branch
+cannot be merged, and the merge node must be the end of main (§14.6).
 
-**Cosa riceve il modello se mergio un branch senza spuntare niente?**
-Niente: `render_merge_block` restituisce la stringa vuota e il blocco non viene creato. Nei
-dati però il branch resta `MERGED`, perché serve per la cronologia e per l'esperimento
-(§14.4).
+**What does the model receive if I merge a branch without checking anything?**
+Nothing: `render_merge_block` returns the empty string and no block is created. In the data,
+though, the branch stays `MERGED`, because it is needed for the history and for the
+experiment (§14.4).
 
-**Un branch può vedere un altro branch?**
-Solo attraverso un merge avvenuto prima del suo anchor: in quel caso vede i punti
-riportati sul main, come li vede il main. Mai i messaggi dell'altro branch.
+**Can a branch see another branch?**
+Only through a merge that happened before its anchor: in that case it sees the points brought
+back to main, as main sees them. Never the other branch's messages.
 
-**Quanto costa costruire un contesto?**
-È lineare nel numero di messaggi, moltiplicato per il numero di branch quando si incontra
-un merge node. Per le dimensioni di una chat è trascurabile; la chiamata al modello costa
-ordini di grandezza in più.
+**How much does building a context cost?**
+It is linear in the number of messages, times the number of branches whenever a merge node is
+met. At the size of a chat it is negligible; the model call costs orders of magnitude more.
 
-**Come so che l'app manda al modello proprio quello che il core costruisce?**
-Ogni chiamata viene salvata in `llm_call_log.prompt_json` con i messaggi esatti, e i test
-del backend confrontano quel testo con l'uscita di `core.context`.
+**How do I know the app sends the model exactly what the core builds?**
+Every call is stored in `llm_call_log.prompt_json` with the exact messages, and the backend
+tests compare that text with the output of `core.context`.

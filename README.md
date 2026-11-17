@@ -100,7 +100,7 @@ is in [DESIGN.md §11](docs/DESIGN.md#11-experiment-after-v1).
 Documentation:
 
 - [docs/DESIGN.md](docs/DESIGN.md): the design, its scope and every decision taken along the way.
-- [docs/CORE.md](docs/CORE.md): how the core works, function by function (in Italian).
+- [docs/CORE.md](docs/CORE.md): how the core works, function by function.
 - [docs/API.md](docs/API.md): the HTTP contract between backend and frontend.
 - [api/README.md](api/README.md) and [web/README.md](web/README.md): notes for each part.
 
