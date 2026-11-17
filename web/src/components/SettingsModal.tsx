@@ -191,6 +191,17 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
         </div>
 
         <ModelField label="Chat model" value={chatModel} onChange={setChatModel} models={models} />
+        {Array.isArray(models) && (
+          <p className="field-note">
+            {(() => {
+              const chosen = models.find((m) => m.id === chatModel.trim());
+              if (!chosen) return `${models.filter((m) => m.images).length} of the listed models accept images.`;
+              return chosen.images
+                ? "This model accepts images."
+                : "This model does not accept images: messages with images will be refused.";
+            })()}
+          </p>
+        )}
 
         <div className="field">
           <label className="check-label">
