@@ -142,3 +142,18 @@ describe("recommendedModel", () => {
     expect(recommendedModel([m("openrouter/free", true)])).toBeNull();
   });
 });
+
+describe("Composer focus", () => {
+  afterEach(cleanup);
+
+  it("takes the focus when asked (a branch just opened)", async () => {
+    render(<Composer label="Message in this branch" placeholder="" disabled={false} onSend={vi.fn(async () => true)} autoFocus />);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Message in this branch")));
+  });
+
+  it("leaves the focus alone otherwise", async () => {
+    render(<Composer label="Message" placeholder="" disabled={false} onSend={vi.fn(async () => true)} />);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(document.activeElement).not.toBe(screen.getByLabelText("Message"));
+  });
+});

@@ -67,6 +67,7 @@ export function BranchPanel({
       }
       disabled={pending !== null || awaiting}
       onSend={onSend}
+      autoFocus={isOpen}
     />
   );
 

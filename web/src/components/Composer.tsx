@@ -14,6 +14,8 @@ interface Props {
   disabled: boolean;
   /** Resolves to false when the message was not stored: text and files are put back. */
   onSend: (text: string, files: File[]) => Promise<boolean>;
+  /** Take the focus when it appears (a branch just opened: one starts typing at once). */
+  autoFocus?: boolean;
 }
 
 const MAX_HEIGHT = 200;
@@ -27,7 +29,7 @@ interface Picked {
 
 let nextKey = 0;
 
-export function Composer({ label, placeholder, disabled, onSend }: Props) {
+export function Composer({ label, placeholder, disabled, onSend, autoFocus = false }: Props) {
   const [value, setValue] = useState("");
   const [picked, setPicked] = useState<Picked[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
@@ -44,6 +46,13 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`;
   }, [value]);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    // After the selection popover and the panel's own effects have settled.
+    const timer = window.setTimeout(() => ref.current?.focus({ preventScroll: true }), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Give the focus back once the reply arrived, unless the user went elsewhere.
   useEffect(() => {
