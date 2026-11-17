@@ -88,6 +88,12 @@ class TakeawayRequest(_Body):
 class PointUpdate(_Body):
     included: bool | None = None
     text_final: str | None = None
+    title: str | None = None
+
+
+class PointCreate(_Body):
+    text: str
+    title: str | None = None
 
 
 class MergeRequest(_Body):
@@ -235,7 +241,17 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
 
     @app.patch("/api/points/{point_id}")
     def update_point(point_id: int, body: PointUpdate) -> dict:
-        return service.update_point(point_id, included=body.included, text_final=body.text_final)
+        return service.update_point(
+            point_id, included=body.included, text_final=body.text_final, title=body.title
+        )
+
+    @app.post("/api/branches/{branch_id}/points", status_code=201)
+    def add_point(branch_id: int, body: PointCreate) -> dict:
+        return service.add_point(branch_id, body.text, body.title)
+
+    @app.delete("/api/points/{point_id}")
+    def delete_point(point_id: int) -> dict:
+        return service.delete_point(point_id)
 
     @app.post("/api/conversations/{conversation_id}/merge")
     def merge(conversation_id: int, body: MergeRequest) -> dict:

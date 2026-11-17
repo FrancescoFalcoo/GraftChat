@@ -37,7 +37,7 @@ from api.provider import (
 )
 from api.settings import SettingsStore, effective_api_key, key_hint
 from core import context, tree
-from core.models import Branch, BranchStatus, CallPurpose, Message, Role, TakeawayPoint
+from core.models import Branch, BranchStatus, CallPurpose, Message, PointOrigin, Role, TakeawayPoint
 
 DEFAULT_TITLE = "New chat"
 TITLE_LENGTH = 60
@@ -186,6 +186,7 @@ def _point_json(point: TakeawayPoint) -> dict:
         "text_generated": point.text_generated,
         "text_final": point.text_final,
         "included": point.included,
+        "origin": point.origin.value,
     }
 
 
@@ -645,7 +646,8 @@ class Service:
             thread = tree.thread(db.load_messages(conn, conversation_id), branch.id)
             if not thread:
                 raise conflict("An empty branch has nothing to bring back: it can only be discarded.")
-            if db.branch_points(conn, branch.id) and not regenerate:
+            generated_before = any(p.origin == PointOrigin.MODEL for p in db.branch_points(conn, branch.id))
+            if generated_before and not regenerate:
                 return self._state(conn, conversation_id)  # cached: never regenerated silently
 
             provider, model = self._model_access(conn, for_takeaway=True)
@@ -680,11 +682,60 @@ class Service:
                     self._check(conn, conversation_id)
             return self._state(conn, conversation_id)
 
-    def update_point(self, point_id: int, *, included: bool | None, text_final: str | None) -> dict:
-        if included is None and text_final is None:
+    def _open_point_branch(self, conn: sqlite3.Connection, branch_id: int) -> Branch:
+        branch = self._require_branch(conn, branch_id)
+        if branch.status != BranchStatus.OPEN:
+            raise conflict(
+                f"This branch is {branch.status.value}: its points are part of the "
+                "conversation history and cannot change."
+            )
+        return branch
+
+    def add_point(self, branch_id: int, text: str, title: str | None) -> dict:
+        """A point the user writes by hand: it enters the context like a generated one (§14.14)."""
+        text = text.strip()
+        if not text:
+            raise invalid("The text of a point cannot be blank.")
+        title = takeaway.title_from(title or "") or takeaway.title_from(text)
+        with self._connect() as conn:
+            with db.transaction(conn):
+                branch = self._open_point_branch(conn, branch_id)
+                if not tree.thread(db.load_messages(conn, branch.conversation_id), branch.id):
+                    raise conflict("An empty branch has nothing to bring back: it can only be discarded.")
+                db.add_user_point(conn, branch.id, title, text)
+                self._check(conn, branch.conversation_id)
+            return self._state(conn, branch.conversation_id)
+
+    def delete_point(self, point_id: int) -> dict:
+        """Remove a point the user added. A generated point is unticked instead, never deleted."""
+        with self._connect() as conn:
+            with db.transaction(conn):
+                point = db.get_point(conn, point_id)
+                if point is None:
+                    raise not_found("Point")
+                branch = self._open_point_branch(conn, point.branch_id)
+                if point.origin != PointOrigin.USER:
+                    raise conflict("A generated point cannot be deleted: untick it instead.")
+                db.delete_point(conn, point_id)
+                self._check(conn, branch.conversation_id)
+            return self._state(conn, branch.conversation_id)
+
+    def update_point(
+        self,
+        point_id: int,
+        *,
+        included: bool | None,
+        text_final: str | None,
+        title: str | None = None,
+    ) -> dict:
+        if included is None and text_final is None and title is None:
             raise invalid("Nothing to change.")
         if text_final is not None and not text_final.strip():
             raise invalid("The text of a point cannot be blank: untick the point instead.")
+        if title is not None:
+            title = takeaway.title_from(title)
+            if not title:
+                raise invalid("The title of a point cannot be blank.")
         with self._connect() as conn:
             with db.transaction(conn):
                 point = db.get_point(conn, point_id)
@@ -696,7 +747,7 @@ class Service:
                         f"This branch is {branch.status.value}: its points are part of the "
                         "conversation history and cannot change."
                     )
-                db.update_point(conn, point_id, included=included, text_final=text_final)
+                db.update_point(conn, point_id, included=included, text_final=text_final, title=title)
                 self._check(conn, branch.conversation_id)
             return self._state(conn, branch.conversation_id)
 

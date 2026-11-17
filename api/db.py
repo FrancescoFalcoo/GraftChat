@@ -22,6 +22,7 @@ from core.models import (
     Conversation,
     LLMCallLog,
     Message,
+    PointOrigin,
     Role,
     TakeawayPoint,
 )
@@ -135,6 +136,7 @@ def _point(row: sqlite3.Row) -> TakeawayPoint:
         text_generated=row["text_generated"],
         text_final=row["text_final"],
         included=bool(row["included"]),
+        origin=PointOrigin(row["origin"]),
     )
 
 
@@ -417,12 +419,23 @@ def branch_points(conn: sqlite3.Connection, branch_id: int) -> list[TakeawayPoin
 def replace_points(
     conn: sqlite3.Connection, branch_id: int, items: Sequence[tuple[str, str]]
 ) -> list[TakeawayPoint]:
-    """Replace a branch's points with freshly generated ``(title, text)`` pairs.
+    """Replace a branch's generated points with freshly generated ``(title, text)`` pairs.
 
     New points are all included (DESIGN.md §8) and ``text_final`` starts equal
-    to ``text_generated``.
+    to ``text_generated``. Points the user added stay, after the new ones, in
+    their order (§14.14).
     """
-    conn.execute("DELETE FROM takeaway_point WHERE branch_id = ?", (branch_id,))
+    conn.execute("DELETE FROM takeaway_point WHERE branch_id = ? AND origin = 'model'", (branch_id,))
+    kept = conn.execute(
+        "SELECT id FROM takeaway_point WHERE branch_id = ? ORDER BY position", (branch_id,)
+    ).fetchall()
+    # Two passes, so that no two rows ever share a position (UNIQUE (branch_id, position)).
+    for offset, row in enumerate(kept):
+        conn.execute("UPDATE takeaway_point SET position = ? WHERE id = ?", (-1 - offset, row["id"]))
+    for offset, row in enumerate(kept):
+        conn.execute(
+            "UPDATE takeaway_point SET position = ? WHERE id = ?", (len(items) + offset, row["id"])
+        )
     for position, (title, text) in enumerate(items):
         conn.execute(
             """
@@ -435,14 +448,37 @@ def replace_points(
     return branch_points(conn, branch_id)
 
 
+def add_user_point(conn: sqlite3.Connection, branch_id: int, title: str, text: str) -> TakeawayPoint:
+    """Append a point written by the user: included, nothing generated (§14.14)."""
+    position = conn.execute(
+        "SELECT IFNULL(MAX(position), -1) + 1 FROM takeaway_point WHERE branch_id = ?", (branch_id,)
+    ).fetchone()[0]
+    cur = conn.execute(
+        """
+        INSERT INTO takeaway_point (branch_id, position, title, text_generated, text_final,
+                                    included, origin)
+        VALUES (?, ?, ?, '', ?, 1, 'user')
+        """,
+        (branch_id, position, title, text),
+    )
+    return get_point(conn, cur.lastrowid)
+
+
+def delete_point(conn: sqlite3.Connection, point_id: int) -> None:
+    conn.execute("DELETE FROM takeaway_point WHERE id = ?", (point_id,))
+
+
 def update_point(
     conn: sqlite3.Connection,
     point_id: int,
     *,
     included: bool | None = None,
     text_final: str | None = None,
+    title: str | None = None,
 ) -> None:
-    """Change the checkbox and/or the final text. ``text_generated`` is never touched."""
+    """Change the checkbox, the final text and/or the title. ``text_generated`` is never touched."""
+    if title is not None:
+        conn.execute("UPDATE takeaway_point SET title = ? WHERE id = ?", (title, point_id))
     if included is not None:
         conn.execute(
             "UPDATE takeaway_point SET included = ? WHERE id = ?", (int(included), point_id)

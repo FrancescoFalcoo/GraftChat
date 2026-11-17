@@ -117,6 +117,11 @@ def _clean_title(title: str) -> str:
     return " ".join(words[:MAX_TITLE_WORDS])
 
 
+def title_from(text: str) -> str:
+    """A checklist title of at most five words, for a point the user writes or renames."""
+    return _clean_title(text)
+
+
 def parse(answer: str) -> list[GeneratedPoint]:
     """Turn the model's answer into 1–6 points.
 
