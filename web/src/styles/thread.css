@@ -380,6 +380,92 @@
   box-shadow: 0 0 0 1px var(--ink);
 }
 
+/* Images: a row of thumbnails that wraps above the text box. */
+.composer {
+  flex-wrap: wrap;
+}
+
+.composer[data-dragging] {
+  border-style: dashed;
+  border-color: var(--ink);
+}
+
+.attach-tray {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+}
+
+.attach-thumb {
+  position: relative;
+  margin: 0;
+}
+
+.attach-thumb img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
+}
+
+.attach-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.attach-problem {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-s);
+}
+
+.composer-attach {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+}
+
+/* Images on a user message, above its text. */
+.msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: var(--measure);
+}
+
+.msg-images img {
+  display: block;
+  max-width: min(240px, 100%);
+  max-height: 240px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
+  object-fit: contain;
+  background: var(--wash);
+}
+
+.msg-optimistic .msg-images img {
+  opacity: 0.65;
+}
+
 .composer textarea {
   flex: 1;
   min-width: 0;

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, toApiError } from "../api";
 import type { AnchorSelection } from "../selection";
-import type { ConversationState, ConversationSummary, Health, Settings } from "../types";
+import type {
+  ConversationState,
+  ConversationSummary,
+  Health,
+  ImageUpload,
+  Settings,
+} from "../types";
 import {
   isEmptyConversation,
   loadLastConversationId,
@@ -9,12 +15,15 @@ import {
   threadKey,
   threadMessages,
 } from "../util";
+import { toUpload } from "../images";
 import { playGlop } from "../sound";
 import { useToasts } from "./useToasts";
 
 /** A model call in flight on a thread. `text` is the optimistic user message, if any. */
 export interface PendingRequest {
   text: string | null;
+  /** Object URLs of the images sent with it, shown until the server state arrives. */
+  images?: string[];
 }
 
 /** Which branches the merge dialog pre-selects for merging. */
@@ -174,7 +183,7 @@ export function useGraft() {
 
   /** Resolves to true when the text is now stored server-side (the composer may clear). */
   const sendMessage = useCallback(
-    async (branchId: number | null, text: string): Promise<boolean> => {
+    async (branchId: number | null, text: string, files: File[] = []): Promise<boolean> => {
       let conversationId = activeRef.current;
       if (conversationId === null) {
         try {
@@ -187,9 +196,17 @@ export function useGraft() {
         }
       }
       const key = threadKey(conversationId, branchId);
-      setThreadPending(key, { text });
+      const previews = files.map((f) => URL.createObjectURL(f));
+      setThreadPending(key, { text, images: previews });
       try {
-        applyState(await api.sendMessage(conversationId, text, branchId));
+        let images: ImageUpload[] = [];
+        try {
+          images = await Promise.all(files.map(toUpload));
+        } catch (e) {
+          pushError(e);
+          return false; // nothing was sent
+        }
+        applyState(await api.sendMessage(conversationId, text, branchId, images));
         return true;
       } catch (e) {
         const err = toApiError(e);
@@ -202,6 +219,7 @@ export function useGraft() {
         return last?.role === "user" && last.content.trim() === text.trim();
       } finally {
         setThreadPending(key, null);
+        previews.forEach((url) => URL.revokeObjectURL(url));
         afterModelCall();
       }
     },

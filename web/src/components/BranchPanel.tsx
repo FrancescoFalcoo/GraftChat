@@ -15,7 +15,7 @@ interface Props {
   known: Branch[];
   pending: PendingRequest | null;
   onClose: () => void;
-  onSend: (text: string) => Promise<boolean>;
+  onSend: (text: string, images: File[]) => Promise<boolean>;
   onRetry: () => void;
   onDelete: (messageId: number) => void;
   onMerge: () => void;

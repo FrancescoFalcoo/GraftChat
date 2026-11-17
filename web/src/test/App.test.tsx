@@ -7,7 +7,7 @@ const NOW = "2026-11-16T10:00:00Z";
 const ANSWER = "\u{1F600} First point\n\n**Second** point is here\n- third";
 
 function msg(id: number, role: Message["role"], content: string, branchId: number | null = null): Message {
-  return { id, branch_id: branchId, parent_id: null, role, content, created_at: NOW };
+  return { id, branch_id: branchId, parent_id: null, role, content, created_at: NOW, attachments: [] };
 }
 
 function baseState(): ConversationState {

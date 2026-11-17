@@ -3,6 +3,14 @@
 export type Role = "user" | "assistant" | "merge";
 export type BranchStatus = "open" | "merged" | "discarded";
 
+export interface Attachment {
+  id: number;
+  kind: "image";
+  mime: string;
+  name: string;
+  size: number;
+}
+
 export interface Message {
   id: number;
   branch_id: number | null;
@@ -10,6 +18,14 @@ export interface Message {
   role: Role;
   content: string;
   created_at: string;
+  attachments: Attachment[];
+}
+
+/** An image sent with a new message: base64 without the "data:" prefix. */
+export interface ImageUpload {
+  name: string;
+  mime: string;
+  data: string;
 }
 
 export interface Point {
@@ -78,6 +94,7 @@ export interface Model {
   id: string;
   name: string;
   context_length: number | null;
+  images: boolean;
 }
 
 export interface OpenBranchRequest {

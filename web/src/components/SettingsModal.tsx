@@ -44,7 +44,13 @@ function ModelField({ label, value, onChange, models, disabled = false }: ModelF
         <datalist id={listId}>
           {models.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.context_length ? `${m.name} (${m.context_length.toLocaleString()} tokens)` : m.name}
+              {[
+                m.name,
+                m.context_length ? `${m.context_length.toLocaleString()} tokens` : null,
+                m.images ? "images" : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </option>
           ))}
         </datalist>

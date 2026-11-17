@@ -2,6 +2,7 @@ import type {
   ConversationState,
   ConversationSummary,
   Health,
+  ImageUpload,
   Model,
   OpenBranchRequest,
   OpenBranchResponse,
@@ -76,6 +77,10 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   }
 }
 
+export function attachmentUrl(id: number): string {
+  return `/api/attachments/${id}`;
+}
+
 export const api = {
   health: () => request<Health>("GET", "/api/health"),
   getSettings: () => request<Settings>("GET", "/api/settings"),
@@ -91,10 +96,16 @@ export const api = {
     request<ConversationState>("POST", "/api/conversations", title ? { title } : {}),
   getConversation: (id: number) => request<ConversationState>("GET", `/api/conversations/${id}`),
 
-  sendMessage: (conversationId: number, content: string, branchId: number | null) =>
+  sendMessage: (
+    conversationId: number,
+    content: string,
+    branchId: number | null,
+    images: ImageUpload[] = [],
+  ) =>
     request<ConversationState>("POST", `/api/conversations/${conversationId}/messages`, {
       content,
       branch_id: branchId,
+      ...(images.length > 0 ? { images } : {}),
     }),
   generate: (conversationId: number, branchId: number | null) =>
     request<ConversationState>("POST", `/api/conversations/${conversationId}/generate`, {

@@ -8,7 +8,7 @@ import type { Branch, ConversationState, Message, Point } from "../types";
 const NOW = "2026-11-16T10:00:00Z";
 
 function message(id: number, role: Message["role"], content: string, branchId: number | null): Message {
-  return { id, branch_id: branchId, parent_id: null, role, content, created_at: NOW };
+  return { id, branch_id: branchId, parent_id: null, role, content, created_at: NOW, attachments: [] };
 }
 
 function branch(id: number, quote: string, messages: Message[]): Branch {

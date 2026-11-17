@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import { attachmentUrl } from "../api";
 import { useFreshIds } from "../hooks/useFreshIds";
 import type { PendingRequest } from "../hooks/useGraft";
-import type { Message } from "../types";
+import type { Attachment, Message } from "../types";
 import { MessageContent } from "./MessageContent";
 
 interface Props {
@@ -20,6 +21,23 @@ interface Props {
   /** Extra content under an assistant message (anchor chips). */
   renderBelow?: (message: Message) => ReactNode;
   emptyHint: ReactNode;
+}
+
+function Images({ items }: { items: { key: string; src: string; name: string }[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="msg-images">
+      {items.map((i) => (
+        <a key={i.key} href={i.src} target="_blank" rel="noreferrer" title={i.name}>
+          <img src={i.src} alt={i.name} loading="lazy" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function stored(attachments: Attachment[] | undefined) {
+  return (attachments ?? []).map((a) => ({ key: `a${a.id}`, src: attachmentUrl(a.id), name: a.name }));
 }
 
 /** True when the thread ends with a user message nobody answered. */
@@ -63,7 +81,8 @@ export function ThreadView({
         if (m.role === "user") {
           return (
             <div key={m.id} className="turn turn-user msg msg-user" data-turn-id={m.id}>
-              <div className="user-text">{m.content}</div>
+              <Images items={stored(m.attachments)} />
+              {m.content !== "" && <div className="user-text">{m.content}</div>}
               {dangling && last?.id === m.id && (
                 <div className="dangling" role="group" aria-label="No reply was received">
                   <span className="dangling-note">No reply was received. Retry, or delete this message.</span>
@@ -92,7 +111,10 @@ export function ThreadView({
       })}
       {pending && pending.text !== null && (
         <div className="turn turn-user msg msg-user msg-optimistic">
-          <div className="user-text">{pending.text}</div>
+          <Images
+            items={(pending.images ?? []).map((src, i) => ({ key: `p${i}`, src, name: "image" }))}
+          />
+          {pending.text !== "" && <div className="user-text">{pending.text}</div>}
         </div>
       )}
       {pending && (

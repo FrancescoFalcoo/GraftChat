@@ -65,7 +65,7 @@ export function App() {
               />
             ) : null
           }
-          onSend={(text) => g.sendMessage(null, text)}
+          onSend={(text, images) => g.sendMessage(null, text, images)}
           onRetry={() => void g.retry(null)}
           onDelete={(id) => void g.deleteMessage(id)}
           onOpenBranch={g.openBranch}
@@ -78,7 +78,7 @@ export function App() {
             known={state ? knownMerges(state, panelBranch) : []}
             pending={g.pendingFor(panelBranch.id)}
             onClose={g.closePanel}
-            onSend={(text) => g.sendMessage(panelBranch.id, text)}
+            onSend={(text, images) => g.sendMessage(panelBranch.id, text, images)}
             onRetry={() => void g.retry(panelBranch.id)}
             onDelete={(id) => void g.deleteMessage(id)}
             onMerge={() => g.openMerge([panelBranch.id])}
