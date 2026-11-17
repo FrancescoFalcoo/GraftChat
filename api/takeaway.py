@@ -56,20 +56,22 @@ class TakeawayParseError(ValueError):
 def build_prompt(
     anchor_quote: str,
     branch_messages: Sequence[Message],
-    images: Mapping[int, Sequence[str]] | None = None,
+    files: Mapping[int, Sequence[tuple[str, str]]] | None = None,
 ) -> list[ChatMessage]:
     """The messages sent to the model to summarise one branch.
 
     ``branch_messages`` is the branch thread in order (``core.tree.thread``).
-    ``images`` maps a message id to the names of the images attached to it: the
-    transcript is text only, so each image is named, not sent.
+    ``files`` maps a message id to the ``(kind, name)`` of the files attached to
+    it (kind: image | document): the transcript names them, it does not include
+    them, since the assistant's answers already say what mattered in them.
     """
     lines = []
     for message in branch_messages:
         speaker = "User" if message.role == Role.USER else "Assistant"
         text = message.content
-        for name in (images or {}).get(message.id, []):
-            text = f"{text}\n[image attached: {name}]" if text else f"[image attached: {name}]"
+        for kind, name in (files or {}).get(message.id, []):
+            note = f"[{kind} attached: {name}]"
+            text = f"{text}\n{note}" if text else note
         lines.append(f"[{speaker}]\n{text}")
     transcript = "\n\n".join(lines)
     user = (

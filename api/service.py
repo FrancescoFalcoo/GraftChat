@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from api import db, takeaway
+from api import db, documents, takeaway
 from api.config import Config
 from api.provider import (
     ChatMessage,
@@ -43,8 +43,10 @@ DEFAULT_TITLE = "New chat"
 TITLE_LENGTH = 60
 MODELS_CACHE_S = 600
 
-# Images on a user message (docs/API.md, "Chat"). The types every vision model on
-# OpenRouter accepts; each is recognised by its first bytes, not by the name sent.
+# Files on a user message (docs/API.md, "Chat"): images, sent as images, and documents,
+# sent as their extracted text (api/documents.py). Images are recognised by their first
+# bytes, in the types every vision model on OpenRouter accepts.
+MAX_FILES = 6
 MAX_IMAGES = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 IMAGE_SIGNATURES = {
@@ -82,12 +84,26 @@ _PROVIDER_CODES = {"auth": "provider_auth", "rate_limit": "provider_rate_limit"}
 
 
 @dataclass(frozen=True)
-class ImageUpload:
-    """An image as it arrives with a new message, already decoded."""
+class Upload:
+    """A file as it arrives with a new message, already decoded from base64."""
 
+    name: str
+    mime: str  # as the client says; informative only
+    data: bytes
+
+
+ImageUpload = Upload  # the name used before documents existed
+
+
+@dataclass(frozen=True)
+class Prepared:
+    """A checked file, ready to store: ``kind`` image or document, ``text`` for documents."""
+
+    kind: str
     name: str
     mime: str
     data: bytes
+    text: str | None = None
 
 
 def _sniff_image(data: bytes) -> str | None:
@@ -100,22 +116,40 @@ def _sniff_image(data: bytes) -> str | None:
     return None
 
 
-def _check_images(images: Sequence[ImageUpload]) -> list[ImageUpload]:
-    """Validate the images of a new message; the stored MIME type is the sniffed one."""
-    if len(images) > MAX_IMAGES:
+def _prepare_files(files: Sequence[Upload]) -> list[Prepared]:
+    """Check the files of a new message and read the text of its documents.
+
+    The kind comes from the bytes: an image signature makes an image, anything else
+    must be a document ``api.documents`` can read. Nothing is stored if one file is
+    refused, so the user can fix it and send again.
+    """
+    if len(files) > MAX_FILES:
+        raise invalid(f"At most {MAX_FILES} files per message.")
+    prepared = []
+    for upload in files:
+        name = (upload.name or "file").strip()[:200] or "file"
+        if not upload.data:
+            raise invalid(f"{name!r} is empty.")
+        mime = _sniff_image(upload.data)
+        if mime is not None:
+            if len(upload.data) > MAX_IMAGE_BYTES:
+                raise invalid(f"The image {name!r} is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
+            prepared.append(Prepared("image", name, mime, upload.data))
+            continue
+        kind = documents.document_kind(name, upload.data)
+        if kind is None:
+            raise invalid(
+                f"{name!r} is not a supported file: images (PNG, JPEG, GIF, WebP), PDF, "
+                "Word (.docx), or plain text and code."
+            )
+        try:
+            text = documents.extract_text(kind, name, upload.data)
+        except documents.DocumentError as error:
+            raise invalid(str(error)) from error
+        prepared.append(Prepared("document", name, documents.DOCUMENT_MIME[kind], upload.data, text))
+    if sum(1 for p in prepared if p.kind == "image") > MAX_IMAGES:
         raise invalid(f"At most {MAX_IMAGES} images per message.")
-    checked = []
-    for image in images:
-        if not image.data:
-            raise invalid(f"The image {image.name!r} is empty.")
-        if len(image.data) > MAX_IMAGE_BYTES:
-            raise invalid(f"The image {image.name!r} is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
-        mime = _sniff_image(image.data)
-        if mime is None:
-            raise invalid(f"{image.name!r} is not a PNG, JPEG, GIF or WebP image.")
-        name = (image.name or "image").strip()[:200] or "image"
-        checked.append(ImageUpload(name=name, mime=mime, data=image.data))
-    return checked
+    return prepared
 
 
 def _title_from(content: str) -> str:
@@ -137,7 +171,7 @@ def _message_json(message: Message, attachments: dict[int, list[db.Attachment]])
         "content": message.content,
         "created_at": message.created_at.isoformat(),
         "attachments": [
-            {"id": a.id, "kind": a.kind, "mime": a.mime, "name": a.name, "size": a.size}
+            {"id": a.id, "kind": a.kind, "mime": a.mime, "name": a.name, "size": a.size, "chars": a.chars}
             for a in attachments.get(message.id, [])
         ],
     }
@@ -343,10 +377,12 @@ class Service:
     ) -> list[ChatMessage]:
         """Ask core for the exact model input of the next call on a thread (DESIGN.md §7).
 
-        core builds the text. Each message then carries the images of the stored
-        message it renders (``ContextMessage.source_id``). With ``images=False``
-        (a model known not to accept them) every image is replaced by a short
-        note, so the call does not fail and the log says what was left out.
+        core builds the text. Each message then gets the files of the stored
+        message it renders (``ContextMessage.source_id``): the text of its
+        documents, each in ``<document>`` delimiters after what the user typed
+        (DESIGN.md §14.13), and its images. With ``images=False`` (a model known
+        not to accept them) every image is replaced by a short note, so the call
+        does not fail and the log says what was left out.
         """
         messages, branches, points = db.load_state(conn, conversation_id)
         if branch is None:
@@ -357,18 +393,18 @@ class Service:
         prompt = []
         for m in built.messages:
             own = attachments.get(m.source_id, []) if m.source_id is not None else []
-            if not own:
-                prompt.append(ChatMessage(m.role, m.content))
-            elif images:
-                parts = []
-                for a in own:
+            texts = [m.content] if m.content else []
+            parts = []
+            for a in own:
+                if a.kind == "document":
+                    texts.append(documents.render_document(a.name, db.attachment_text(conn, a.id) or ""))
+                elif images:
                     found = db.attachment_data(conn, a.id)
                     if found is not None:
                         parts.append(ImagePart(mime=a.mime, data=found[1], ref=f"attachment:{a.id}"))
-                prompt.append(ChatMessage(m.role, m.content, tuple(parts)))
-            else:
-                notes = "\n".join(IMAGE_OMITTED for _ in own)
-                prompt.append(ChatMessage(m.role, f"{m.content}\n\n{notes}" if m.content else notes))
+                else:
+                    texts.append(IMAGE_OMITTED)
+            prompt.append(ChatMessage(m.role, "\n\n".join(texts), tuple(parts)))
         return prompt
 
     def _accepts_images(self, model: str) -> bool | None:
@@ -464,11 +500,12 @@ class Service:
         conversation_id: int,
         content: str,
         branch_id: int | None,
-        images: Sequence[ImageUpload] = (),
+        files: Sequence[Upload] = (),
     ) -> dict:
         content = content.strip()
-        images = _check_images(images)
-        if not content and not images:
+        files = _prepare_files(files)
+        images = [f for f in files if f.kind == "image"]
+        if not content and not files:
             raise invalid("The message is empty.")
         with self._connect() as conn:
             self._chat_branch(conn, conversation_id, branch_id)
@@ -500,19 +537,21 @@ class Service:
                         content=content,
                         now=self._now(),
                     )
-                    for position, image in enumerate(images):
+                    for position, file in enumerate(files):
                         db.insert_attachment(
                             conn,
                             message_id=stored.id,
                             position=position,
-                            mime=image.mime,
-                            name=image.name,
-                            data=image.data,
+                            kind=file.kind,
+                            mime=file.mime,
+                            name=file.name,
+                            data=file.data,
+                            text=file.text,
                             now=self._now(),
                         )
                     conversation = db.get_conversation(conn, conversation_id)
                     if branch_id is None and not thread and conversation.title == DEFAULT_TITLE:
-                        title = _title_from(content) if content else _title_from(images[0].name)
+                        title = _title_from(content) if content else _title_from(files[0].name)
                         db.rename_conversation(conn, conversation_id, title)
                     prompt = self._build_context(conn, conversation_id, branch, images=vision is not False)
                     self._check(conn, conversation_id)
@@ -613,11 +652,11 @@ class Service:
             busy = "The take-away of this branch is already being generated."
             with self._exclusive(("takeaway", branch.id), busy):
                 call = dict(conversation_id=conversation_id, branch_id=branch.id, purpose=CallPurpose.TAKEAWAY)
-                images = {
-                    message_id: [a.name for a in found]
+                files = {
+                    message_id: [(a.kind, a.name) for a in found]
                     for message_id, found in db.load_attachments(conn, conversation_id).items()
                 }
-                prompt = takeaway.build_prompt(branch.anchor_quote, thread, images)
+                prompt = takeaway.build_prompt(branch.anchor_quote, thread, files)
                 answer = self._call(conn, provider, model, prompt, **call).text
                 try:
                     generated = takeaway.parse(answer)
@@ -711,13 +750,13 @@ class Service:
                 self._check(conn, conversation_id)
             return self._state(conn, conversation_id)
 
-    def attachment(self, attachment_id: int) -> tuple[str, bytes]:
-        """The MIME type and bytes of a stored image."""
+    def attachment(self, attachment_id: int) -> tuple[db.Attachment, bytes]:
+        """A stored file and its bytes."""
         with self._connect() as conn:
             found = db.attachment_data(conn, attachment_id)
         if found is None:
             raise not_found("Attachment")
-        return found[0].mime, found[1]
+        return found
 
     # --- settings and models ------------------------------------------------------
 

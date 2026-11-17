@@ -167,9 +167,10 @@ def test_images_of_main_reach_a_branch_opened_after_them(client, provider):
     "images, fragment",
     [
         ([{"name": "x.png", "data": "not base64!"}], "base64"),
-        ([{"name": "x.txt", "data": b64(b"hello, plain text")}], "not a PNG"),
+        ([{"name": "x.bin", "data": b64(b" binary")}], "not a supported file"),
         ([{"name": "x.png", "data": ""}], "empty"),
         ([{"name": f"{i}.png", "data": b64(PNG)} for i in range(5)], "At most"),
+        ([{"name": f"{i}.txt", "data": b64(b"note")} for i in range(7)], "At most 6 files"),
     ],
 )
 def test_bad_images_are_refused_and_nothing_is_stored(client, provider, images, fragment):

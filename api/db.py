@@ -321,16 +321,17 @@ def update_branch_status(conn: sqlite3.Connection, branch: Branch) -> None:
 
 @dataclass(frozen=True)
 class Attachment:
-    """An image attached to a user message (not part of ``core``: the model input
-    ``core.context`` builds is text; the API adds the images of each message)."""
+    """An image or a document attached to a user message (not part of ``core``: the
+    API adds them to the text ``core.context`` builds, see api/service.py)."""
 
     id: int
     message_id: int
     position: int
-    kind: str
+    kind: str  # image | document
     mime: str
     name: str
-    size: int
+    size: int  # bytes of the file
+    chars: int | None = None  # characters of extracted text; documents only
 
 
 def _attachment(row: sqlite3.Row) -> Attachment:
@@ -342,6 +343,7 @@ def _attachment(row: sqlite3.Row) -> Attachment:
         mime=row["mime"],
         name=row["name"],
         size=row["size"],
+        chars=row["chars"],
     )
 
 
@@ -354,13 +356,15 @@ def insert_attachment(
     name: str,
     data: bytes,
     now: datetime,
+    kind: str = "image",
+    text: str | None = None,
 ) -> None:
     conn.execute(
         """
-        INSERT INTO attachment (message_id, position, kind, mime, name, size, data, created_at)
-        VALUES (?, ?, 'image', ?, ?, ?, ?, ?)
+        INSERT INTO attachment (message_id, position, kind, mime, name, size, data, text, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (message_id, position, mime, name, len(data), data, now.isoformat()),
+        (message_id, position, kind, mime, name, len(data), data, text, now.isoformat()),
     )
 
 
@@ -368,7 +372,8 @@ def load_attachments(conn: sqlite3.Connection, conversation_id: int) -> dict[int
     """The attachments of one conversation, by message id, in position order (no bytes)."""
     rows = conn.execute(
         """
-        SELECT a.id, a.message_id, a.position, a.kind, a.mime, a.name, a.size
+        SELECT a.id, a.message_id, a.position, a.kind, a.mime, a.name, a.size,
+               length(a.text) AS chars
         FROM attachment a JOIN message m ON m.id = a.message_id
         WHERE m.conversation_id = ?
         ORDER BY a.message_id, a.position
@@ -382,8 +387,16 @@ def load_attachments(conn: sqlite3.Connection, conversation_id: int) -> dict[int
 
 
 def attachment_data(conn: sqlite3.Connection, attachment_id: int) -> tuple[Attachment, bytes] | None:
-    row = conn.execute("SELECT * FROM attachment WHERE id = ?", (attachment_id,)).fetchone()
+    row = conn.execute(
+        "SELECT *, length(text) AS chars FROM attachment WHERE id = ?", (attachment_id,)
+    ).fetchone()
     return (_attachment(row), bytes(row["data"])) if row else None
+
+
+def attachment_text(conn: sqlite3.Connection, attachment_id: int) -> str | None:
+    """The extracted text of a document (None for an image or a missing row)."""
+    row = conn.execute("SELECT text FROM attachment WHERE id = ?", (attachment_id,)).fetchone()
+    return row["text"] if row else None
 
 
 # --- take-away points ---------------------------------------------------------------------

@@ -10,6 +10,7 @@ import base64
 import binascii
 import logging
 import traceback
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -20,7 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.config import Config, load_config
 from api.corestatus import core_status
-from api.service import ApiError, ImageUpload, Service
+from api.service import ApiError, Service, Upload
 from core.tree import InvariantError
 
 log = logging.getLogger("graftchat.api")
@@ -45,26 +46,27 @@ class ConversationRename(_Body):
     title: str
 
 
-class ImageIn(_Body):
-    name: str = "image"
-    mime: str = ""  # informative: the server recognises the type from the bytes
+class FileIn(_Body):
+    name: str = "file"
+    mime: str = ""  # informative: the server recognises the kind from the bytes
     data: str  # base64, without the "data:...;base64," prefix
 
 
 class MessageCreate(_Body):
     content: str = ""
     branch_id: int | None = None
-    images: list[ImageIn] = []
+    files: list[FileIn] = []
+    images: list[FileIn] = []  # older name of `files`, still accepted
 
 
-def _decode_images(images: list[ImageIn]) -> list[ImageUpload]:
+def _decode_files(files: list[FileIn]) -> list[Upload]:
     decoded = []
-    for image in images:
+    for file in files:
         try:
-            data = base64.b64decode(image.data, validate=True)
+            data = base64.b64decode(file.data, validate=True)
         except (binascii.Error, ValueError) as error:
-            raise ApiError(422, "validation", f"The image {image.name!r} is not valid base64.") from error
-        decoded.append(ImageUpload(name=image.name, mime=image.mime, data=data))
+            raise ApiError(422, "validation", f"{file.name!r} is not valid base64.") from error
+        decoded.append(Upload(name=file.name, mime=file.mime, data=data))
     return decoded
 
 
@@ -189,7 +191,7 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
     @app.post("/api/conversations/{conversation_id}/messages")
     def send_message(conversation_id: int, body: MessageCreate) -> dict:
         return service.send_message(
-            conversation_id, body.content, body.branch_id, _decode_images(body.images)
+            conversation_id, body.content, body.branch_id, _decode_files(body.files + body.images)
         )
 
     @app.post("/api/conversations/{conversation_id}/generate")
@@ -198,15 +200,18 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
 
     @app.get("/api/attachments/{attachment_id}")
     def attachment(attachment_id: int) -> Response:
-        mime, data = service.attachment(attachment_id)
-        return Response(
-            data,
-            media_type=mime,  # always one of the sniffed image types, never HTML or SVG
-            headers={
-                "Cache-Control": "private, max-age=31536000, immutable",  # an attachment never changes
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
+        found, data = service.attachment(attachment_id)
+        headers = {
+            "Cache-Control": "private, max-age=31536000, immutable",  # an attachment never changes
+            "X-Content-Type-Options": "nosniff",
+        }
+        if found.kind == "image":
+            # always one of the sniffed image types, never HTML or SVG: safe to show inline
+            return Response(data, media_type=found.mime, headers=headers)
+        # A document is only ever downloaded, never rendered by the browser (an .html file
+        # served inline would run in the app's origin).
+        headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(found.name)}"
+        return Response(data, media_type="application/octet-stream", headers=headers)
 
     @app.delete("/api/messages/{message_id}")
     def delete_message(message_id: int) -> dict:
