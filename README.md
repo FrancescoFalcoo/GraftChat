@@ -141,6 +141,7 @@ Documentation:
 - [docs/CORE.md](docs/CORE.md): how the core works, function by function.
 - [docs/API.md](docs/API.md): the HTTP contract between backend and frontend.
 - [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md): proposal for letting other people try it with their own key.
+- [docs/CONTEXT.md](docs/CONTEXT.md): design for a per-model length meter and deep summaries of old messages.
 - [api/README.md](api/README.md) and [web/README.md](web/README.md): notes for each part.
 
 ## Development
