@@ -172,6 +172,9 @@ cd web && npm test                # frontend tests
 python devtools/preview.py        # what every core function returns on a sample conversation
 ```
 
+Bugs, ideas and pull requests: see [CONTRIBUTING.md](CONTRIBUTING.md). Security problems go
+through private reporting: see [SECURITY.md](SECURITY.md).
+
 ## Status
 
 v1.0 is released: chat, branches, merge with take-aways, points of your own, attachments, the
