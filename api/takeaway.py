@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from api.provider import ChatMessage
@@ -53,15 +53,24 @@ class TakeawayParseError(ValueError):
     """The model's answer does not contain a usable list of points."""
 
 
-def build_prompt(anchor_quote: str, branch_messages: Sequence[Message]) -> list[ChatMessage]:
+def build_prompt(
+    anchor_quote: str,
+    branch_messages: Sequence[Message],
+    images: Mapping[int, Sequence[str]] | None = None,
+) -> list[ChatMessage]:
     """The messages sent to the model to summarise one branch.
 
     ``branch_messages`` is the branch thread in order (``core.tree.thread``).
+    ``images`` maps a message id to the names of the images attached to it: the
+    transcript is text only, so each image is named, not sent.
     """
     lines = []
     for message in branch_messages:
         speaker = "User" if message.role == Role.USER else "Assistant"
-        lines.append(f"[{speaker}]\n{message.content}")
+        text = message.content
+        for name in (images or {}).get(message.id, []):
+            text = f"{text}\n[image attached: {name}]" if text else f"[image attached: {name}]"
+        lines.append(f"[{speaker}]\n{text}")
     transcript = "\n\n".join(lines)
     user = (
         "Passage the side conversation is about:\n"

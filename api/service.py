@@ -18,12 +18,14 @@ import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from api import db, takeaway
 from api.config import Config
 from api.provider import (
     ChatMessage,
+    ImagePart,
     Completion,
     FakeProvider,
     ModelInfo,
@@ -31,6 +33,7 @@ from api.provider import (
     Provider,
     ProviderError,
     fetch_free_models,
+    message_payload,
 )
 from api.settings import SettingsStore, effective_api_key, key_hint
 from core import context, tree
@@ -39,6 +42,18 @@ from core.models import Branch, BranchStatus, CallPurpose, Message, Role, Takeaw
 DEFAULT_TITLE = "New chat"
 TITLE_LENGTH = 60
 MODELS_CACHE_S = 600
+
+# Images on a user message (docs/API.md, "Chat"). The types every vision model on
+# OpenRouter accepts; each is recognised by its first bytes, not by the name sent.
+MAX_IMAGES = 4
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+IMAGE_SIGNATURES = {
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/gif": (b"GIF87a", b"GIF89a"),
+    "image/webp": (b"RIFF",),  # plus "WEBP" at offset 8, checked below
+}
+IMAGE_OMITTED = "[image not sent: the selected model does not accept images]"
 
 
 class ApiError(Exception):
@@ -66,6 +81,43 @@ def invalid(message: str) -> ApiError:
 _PROVIDER_CODES = {"auth": "provider_auth", "rate_limit": "provider_rate_limit"}
 
 
+@dataclass(frozen=True)
+class ImageUpload:
+    """An image as it arrives with a new message, already decoded."""
+
+    name: str
+    mime: str
+    data: bytes
+
+
+def _sniff_image(data: bytes) -> str | None:
+    """The MIME type of an image from its first bytes, or None if it is not a supported one."""
+    for mime, signatures in IMAGE_SIGNATURES.items():
+        if any(data.startswith(sig) for sig in signatures):
+            if mime == "image/webp" and data[8:12] != b"WEBP":
+                continue
+            return mime
+    return None
+
+
+def _check_images(images: Sequence[ImageUpload]) -> list[ImageUpload]:
+    """Validate the images of a new message; the stored MIME type is the sniffed one."""
+    if len(images) > MAX_IMAGES:
+        raise invalid(f"At most {MAX_IMAGES} images per message.")
+    checked = []
+    for image in images:
+        if not image.data:
+            raise invalid(f"The image {image.name!r} is empty.")
+        if len(image.data) > MAX_IMAGE_BYTES:
+            raise invalid(f"The image {image.name!r} is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
+        mime = _sniff_image(image.data)
+        if mime is None:
+            raise invalid(f"{image.name!r} is not a PNG, JPEG, GIF or WebP image.")
+        name = (image.name or "image").strip()[:200] or "image"
+        checked.append(ImageUpload(name=name, mime=mime, data=image.data))
+    return checked
+
+
 def _title_from(content: str) -> str:
     first_line = next((line.strip() for line in content.splitlines() if line.strip()), "")
     if len(first_line) <= TITLE_LENGTH:
@@ -76,7 +128,7 @@ def _title_from(content: str) -> str:
 # --- JSON shapes of docs/API.md -------------------------------------------------------
 
 
-def _message_json(message: Message) -> dict:
+def _message_json(message: Message, attachments: dict[int, list[db.Attachment]]) -> dict:
     return {
         "id": message.id,
         "branch_id": message.branch_id,
@@ -84,6 +136,10 @@ def _message_json(message: Message) -> dict:
         "role": message.role.value,
         "content": message.content,
         "created_at": message.created_at.isoformat(),
+        "attachments": [
+            {"id": a.id, "kind": a.kind, "mime": a.mime, "name": a.name, "size": a.size}
+            for a in attachments.get(message.id, [])
+        ],
     }
 
 
@@ -99,7 +155,12 @@ def _point_json(point: TakeawayPoint) -> dict:
     }
 
 
-def _branch_json(branch: Branch, messages: Sequence[Message], points: Sequence[TakeawayPoint]) -> dict:
+def _branch_json(
+    branch: Branch,
+    messages: Sequence[Message],
+    points: Sequence[TakeawayPoint],
+    attachments: dict[int, list[db.Attachment]],
+) -> dict:
     own_points = sorted((p for p in points if p.branch_id == branch.id), key=lambda p: p.position)
     return {
         "id": branch.id,
@@ -111,7 +172,7 @@ def _branch_json(branch: Branch, messages: Sequence[Message], points: Sequence[T
         "merge_message_id": branch.merge_message_id,
         "base_message_id": branch.base_message_id,
         "created_at": branch.created_at.isoformat(),
-        "messages": [_message_json(m) for m in tree.thread(messages, branch.id)],
+        "messages": [_message_json(m, attachments) for m in tree.thread(messages, branch.id)],
         "points": [_point_json(p) for p in own_points],
     }
 
@@ -171,6 +232,7 @@ class Service:
         if conversation is None:
             raise not_found("Conversation")
         messages, branches, points = db.load_state(conn, conversation_id)
+        attachments = db.load_attachments(conn, conversation_id)
         try:
             pending: list[int] | None = [b.id for b in tree.pending_branches(branches)]
         except NotImplementedError:
@@ -181,8 +243,8 @@ class Service:
                 "title": conversation.title,
                 "created_at": conversation.created_at.isoformat(),
             },
-            "main": [_message_json(m) for m in tree.thread(messages)],
-            "branches": [_branch_json(b, messages, points) for b in branches],
+            "main": [_message_json(m, attachments) for m in tree.thread(messages)],
+            "branches": [_branch_json(b, messages, points, attachments) for b in branches],
             "pending_branch_ids": pending,
         }
 
@@ -262,8 +324,9 @@ class Service:
                 input_tokens=completion.input_tokens,
                 output_tokens=completion.output_tokens,
                 cost_estimate=completion.cost,
+                # Images appear as "attachment:<id>": the bytes are in the attachment table.
                 prompt_json=json.dumps(
-                    [{"role": m.role, "content": m.content} for m in prompt], ensure_ascii=False
+                    [message_payload(m, inline_images=False) for m in prompt], ensure_ascii=False
                 ),
                 response_text=completion.text,
                 now=self._now(),
@@ -271,15 +334,55 @@ class Service:
         return completion
 
     def _build_context(
-        self, conn: sqlite3.Connection, conversation_id: int, branch: Branch | None
+        self,
+        conn: sqlite3.Connection,
+        conversation_id: int,
+        branch: Branch | None,
+        *,
+        images: bool = True,
     ) -> list[ChatMessage]:
-        """Ask core for the exact model input of the next call on a thread (DESIGN.md §7)."""
+        """Ask core for the exact model input of the next call on a thread (DESIGN.md §7).
+
+        core builds the text. Each message then carries the images of the stored
+        message it renders (``ContextMessage.source_id``). With ``images=False``
+        (a model known not to accept them) every image is replaced by a short
+        note, so the call does not fail and the log says what was left out.
+        """
         messages, branches, points = db.load_state(conn, conversation_id)
         if branch is None:
             built = context.build_main_context(messages, branches, points)
         else:
             built = context.build_branch_context(branch, messages, branches, points)
-        return [ChatMessage(m.role, m.content) for m in built.messages]
+        attachments = db.load_attachments(conn, conversation_id)
+        prompt = []
+        for m in built.messages:
+            own = attachments.get(m.source_id, []) if m.source_id is not None else []
+            if not own:
+                prompt.append(ChatMessage(m.role, m.content))
+            elif images:
+                parts = []
+                for a in own:
+                    found = db.attachment_data(conn, a.id)
+                    if found is not None:
+                        parts.append(ImagePart(mime=a.mime, data=found[1], ref=f"attachment:{a.id}"))
+                prompt.append(ChatMessage(m.role, m.content, tuple(parts)))
+            else:
+                notes = "\n".join(IMAGE_OMITTED for _ in own)
+                prompt.append(ChatMessage(m.role, f"{m.content}\n\n{notes}" if m.content else notes))
+        return prompt
+
+    def _accepts_images(self, model: str) -> bool | None:
+        """Whether ``model`` takes images, from OpenRouter's model list. None = unknown."""
+        if self.config.fake_llm:
+            return True
+        try:
+            listed = self.models()["models"]
+        except ApiError:
+            return None  # the list could not be fetched: let the provider decide
+        for m in listed:
+            if m["id"] == model:
+                return bool(m["images"])
+        return None  # not a listed free model (typed by hand): unknown
 
     def _reply(
         self,
@@ -356,13 +459,26 @@ class Service:
 
     # --- chat ---------------------------------------------------------------------
 
-    def send_message(self, conversation_id: int, content: str, branch_id: int | None) -> dict:
+    def send_message(
+        self,
+        conversation_id: int,
+        content: str,
+        branch_id: int | None,
+        images: Sequence[ImageUpload] = (),
+    ) -> dict:
         content = content.strip()
-        if not content:
+        images = _check_images(images)
+        if not content and not images:
             raise invalid("The message is empty.")
         with self._connect() as conn:
             self._chat_branch(conn, conversation_id, branch_id)
             provider, model = self._model_access(conn, for_takeaway=False)
+            vision = self._accepts_images(model)
+            if images and vision is False:
+                raise invalid(
+                    f"The model {model} does not accept images. Choose a model marked "
+                    "'images' in Settings, or send the message without them."
+                )
             busy = "A reply is already being generated on this thread."
             with self._exclusive(("chat", conversation_id, branch_id), busy):
                 # Nothing is stored unless the context can be built: a core stub
@@ -375,7 +491,7 @@ class Service:
                             "This thread is waiting for a reply to its last message: "
                             "retry it or delete it first."
                         )
-                    db.insert_message(
+                    stored = db.insert_message(
                         conn,
                         conversation_id=conversation_id,
                         branch_id=branch_id,
@@ -384,10 +500,21 @@ class Service:
                         content=content,
                         now=self._now(),
                     )
+                    for position, image in enumerate(images):
+                        db.insert_attachment(
+                            conn,
+                            message_id=stored.id,
+                            position=position,
+                            mime=image.mime,
+                            name=image.name,
+                            data=image.data,
+                            now=self._now(),
+                        )
                     conversation = db.get_conversation(conn, conversation_id)
                     if branch_id is None and not thread and conversation.title == DEFAULT_TITLE:
-                        db.rename_conversation(conn, conversation_id, _title_from(content))
-                    prompt = self._build_context(conn, conversation_id, branch)
+                        title = _title_from(content) if content else _title_from(images[0].name)
+                        db.rename_conversation(conn, conversation_id, title)
+                    prompt = self._build_context(conn, conversation_id, branch, images=vision is not False)
                     self._check(conn, conversation_id)
                 # From here on the user message is stored: a provider failure
                 # leaves it there, to be retried with generate() or deleted.
@@ -401,9 +528,10 @@ class Service:
             if not thread or thread[-1].role != Role.USER:
                 raise conflict("This thread is not waiting for a reply.")
             provider, model = self._model_access(conn, for_takeaway=False)
+            images = self._accepts_images(model) is not False
             busy = "A reply is already being generated on this thread."
             with self._exclusive(("chat", conversation_id, branch_id), busy):
-                prompt = self._build_context(conn, conversation_id, branch)
+                prompt = self._build_context(conn, conversation_id, branch, images=images)
                 return self._reply(conn, conversation_id, branch_id, provider, model, prompt)
 
     def delete_message(self, message_id: int) -> dict:
@@ -485,7 +613,11 @@ class Service:
             busy = "The take-away of this branch is already being generated."
             with self._exclusive(("takeaway", branch.id), busy):
                 call = dict(conversation_id=conversation_id, branch_id=branch.id, purpose=CallPurpose.TAKEAWAY)
-                prompt = takeaway.build_prompt(branch.anchor_quote, thread)
+                images = {
+                    message_id: [a.name for a in found]
+                    for message_id, found in db.load_attachments(conn, conversation_id).items()
+                }
+                prompt = takeaway.build_prompt(branch.anchor_quote, thread, images)
                 answer = self._call(conn, provider, model, prompt, **call).text
                 try:
                     generated = takeaway.parse(answer)
@@ -579,6 +711,14 @@ class Service:
                 self._check(conn, conversation_id)
             return self._state(conn, conversation_id)
 
+    def attachment(self, attachment_id: int) -> tuple[str, bytes]:
+        """The MIME type and bytes of a stored image."""
+        with self._connect() as conn:
+            found = db.attachment_data(conn, attachment_id)
+        if found is None:
+            raise not_found("Attachment")
+        return found[0].mime, found[1]
+
     # --- settings and models ------------------------------------------------------
 
     def settings_view(self) -> dict:
@@ -630,7 +770,7 @@ class Service:
                 raise ApiError(502, "provider_error", error.message) from error
         return {
             "models": [
-                {"id": m.id, "name": m.name, "context_length": m.context_length}
+                {"id": m.id, "name": m.name, "context_length": m.context_length, "images": m.images}
                 for m in self._models[1]
             ]
         }

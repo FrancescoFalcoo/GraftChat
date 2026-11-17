@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -313,6 +314,76 @@ def update_branch_status(conn: sqlite3.Connection, branch: Branch) -> None:
         "UPDATE branch SET status = ?, merge_message_id = ? WHERE id = ?",
         (branch.status.value, branch.merge_message_id, branch.id),
     )
+
+
+# --- attachments --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Attachment:
+    """An image attached to a user message (not part of ``core``: the model input
+    ``core.context`` builds is text; the API adds the images of each message)."""
+
+    id: int
+    message_id: int
+    position: int
+    kind: str
+    mime: str
+    name: str
+    size: int
+
+
+def _attachment(row: sqlite3.Row) -> Attachment:
+    return Attachment(
+        id=row["id"],
+        message_id=row["message_id"],
+        position=row["position"],
+        kind=row["kind"],
+        mime=row["mime"],
+        name=row["name"],
+        size=row["size"],
+    )
+
+
+def insert_attachment(
+    conn: sqlite3.Connection,
+    *,
+    message_id: int,
+    position: int,
+    mime: str,
+    name: str,
+    data: bytes,
+    now: datetime,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO attachment (message_id, position, kind, mime, name, size, data, created_at)
+        VALUES (?, ?, 'image', ?, ?, ?, ?, ?)
+        """,
+        (message_id, position, mime, name, len(data), data, now.isoformat()),
+    )
+
+
+def load_attachments(conn: sqlite3.Connection, conversation_id: int) -> dict[int, list[Attachment]]:
+    """The attachments of one conversation, by message id, in position order (no bytes)."""
+    rows = conn.execute(
+        """
+        SELECT a.id, a.message_id, a.position, a.kind, a.mime, a.name, a.size
+        FROM attachment a JOIN message m ON m.id = a.message_id
+        WHERE m.conversation_id = ?
+        ORDER BY a.message_id, a.position
+        """,
+        (conversation_id,),
+    ).fetchall()
+    found: dict[int, list[Attachment]] = {}
+    for row in rows:
+        found.setdefault(row["message_id"], []).append(_attachment(row))
+    return found
+
+
+def attachment_data(conn: sqlite3.Connection, attachment_id: int) -> tuple[Attachment, bytes] | None:
+    row = conn.execute("SELECT * FROM attachment WHERE id = ?", (attachment_id,)).fetchone()
+    return (_attachment(row), bytes(row["data"])) if row else None
 
 
 # --- take-away points ---------------------------------------------------------------------

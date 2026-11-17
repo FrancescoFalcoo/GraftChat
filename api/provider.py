@@ -5,6 +5,7 @@ The rest of the backend only sees ``Provider.complete`` and ``ProviderError``.
 
 from __future__ import annotations
 
+import base64
 import json
 import random
 import time
@@ -25,9 +26,42 @@ MAX_DELAY_S = 20.0
 
 
 @dataclass(frozen=True)
+class ImagePart:
+    """An image sent with a message. ``ref`` names it in the call log (``attachment:<id>``)."""
+
+    mime: str
+    data: bytes
+    ref: str
+
+
+@dataclass(frozen=True)
 class ChatMessage:
     role: str  # system | user | assistant
     content: str
+    images: tuple[ImagePart, ...] = ()
+
+
+def message_payload(message: ChatMessage, *, inline_images: bool = True) -> dict:
+    """One message in OpenRouter's (OpenAI-compatible) format.
+
+    A message with images becomes a list of parts: the text, then one
+    ``image_url`` part per image, as a base64 data URL. With
+    ``inline_images=False`` each URL is the image's ``ref`` instead: that is the
+    form stored in the call log, which keeps the log readable and small while
+    still saying exactly which image was sent where.
+    """
+    if not message.images:
+        return {"role": message.role, "content": message.content}
+    parts: list[dict] = []
+    if message.content:
+        parts.append({"type": "text", "text": message.content})
+    for image in message.images:
+        if inline_images:
+            url = f"data:{image.mime};base64,{base64.b64encode(image.data).decode('ascii')}"
+        else:
+            url = image.ref
+        parts.append({"type": "image_url", "image_url": {"url": url}})
+    return {"role": message.role, "content": parts}
 
 
 @dataclass(frozen=True)
@@ -44,6 +78,7 @@ class ModelInfo:
     id: str
     name: str
     context_length: int | None
+    images: bool = False  # the model accepts images as input
 
 
 class ProviderError(Exception):
@@ -112,7 +147,7 @@ class OpenRouterProvider:
     def complete(self, model: str, messages: Sequence[ChatMessage], *, tag: str = "chat") -> Completion:
         payload = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [message_payload(m) for m in messages],
         }
         last: ProviderError | None = None
         for attempt in range(self._max_attempts):
@@ -209,6 +244,14 @@ def _outputs_text_only(model: dict) -> bool:
     return outputs == ["text"] if isinstance(outputs, list) else True
 
 
+def _accepts_images(model: dict) -> bool:
+    architecture = model.get("architecture")
+    if not isinstance(architecture, dict):
+        return False
+    inputs = architecture.get("input_modalities")
+    return isinstance(inputs, list) and "image" in inputs
+
+
 def fetch_free_models(client: httpx.Client | None = None) -> list[ModelInfo]:
     """The free text models OpenRouter currently lists (public endpoint, no key needed)."""
     client = client or httpx.Client(timeout=httpx.Timeout(20.0, connect=10.0))
@@ -231,6 +274,7 @@ def fetch_free_models(client: httpx.Client | None = None) -> list[ModelInfo]:
                 id=model["id"],
                 name=str(model.get("name") or model["id"]),
                 context_length=context if isinstance(context, int) else None,
+                images=_accepts_images(model),
             )
         )
     return sorted(models, key=lambda m: m.name.lower())
@@ -258,7 +302,9 @@ class FakeProvider:
                 "1. **First point.** A short explanation you can select and branch from.\n"
                 "2. **Second point.** Another passage, with some `inline code`.\n"
                 "3. **Third point.** A final remark to follow up on.\n\n"
-                f"(The model received {len(messages)} messages.)"
+                f"(The model received {len(messages)} messages"
+                + (f" and {images} images" if (images := sum(len(m.images) for m in messages)) else "")
+                + ".)"
             )
         words_in = sum(len(m.content.split()) for m in messages)
         return Completion(

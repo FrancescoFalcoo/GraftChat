@@ -6,19 +6,21 @@ Run it with ``python -m api``.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import traceback
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.config import Config, load_config
 from api.corestatus import core_status
-from api.service import ApiError, Service
+from api.service import ApiError, ImageUpload, Service
 from core.tree import InvariantError
 
 log = logging.getLogger("graftchat.api")
@@ -43,9 +45,27 @@ class ConversationRename(_Body):
     title: str
 
 
+class ImageIn(_Body):
+    name: str = "image"
+    mime: str = ""  # informative: the server recognises the type from the bytes
+    data: str  # base64, without the "data:...;base64," prefix
+
+
 class MessageCreate(_Body):
-    content: str
+    content: str = ""
     branch_id: int | None = None
+    images: list[ImageIn] = []
+
+
+def _decode_images(images: list[ImageIn]) -> list[ImageUpload]:
+    decoded = []
+    for image in images:
+        try:
+            data = base64.b64decode(image.data, validate=True)
+        except (binascii.Error, ValueError) as error:
+            raise ApiError(422, "validation", f"The image {image.name!r} is not valid base64.") from error
+        decoded.append(ImageUpload(name=image.name, mime=image.mime, data=data))
+    return decoded
 
 
 class GenerateRequest(_Body):
@@ -168,11 +188,25 @@ def create_app(service: Service | None = None, config: Config | None = None) -> 
 
     @app.post("/api/conversations/{conversation_id}/messages")
     def send_message(conversation_id: int, body: MessageCreate) -> dict:
-        return service.send_message(conversation_id, body.content, body.branch_id)
+        return service.send_message(
+            conversation_id, body.content, body.branch_id, _decode_images(body.images)
+        )
 
     @app.post("/api/conversations/{conversation_id}/generate")
     def generate(conversation_id: int, body: GenerateRequest | None = None) -> dict:
         return service.generate(conversation_id, body.branch_id if body else None)
+
+    @app.get("/api/attachments/{attachment_id}")
+    def attachment(attachment_id: int) -> Response:
+        mime, data = service.attachment(attachment_id)
+        return Response(
+            data,
+            media_type=mime,  # always one of the sniffed image types, never HTML or SVG
+            headers={
+                "Cache-Control": "private, max-age=31536000, immutable",  # an attachment never changes
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @app.delete("/api/messages/{message_id}")
     def delete_message(message_id: int) -> dict:

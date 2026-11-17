@@ -121,7 +121,7 @@ def test_api_key_can_be_removed(client):
 
 def test_models_endpoint(client):
     models = client.get("/api/models").json()["models"]
-    assert models[0] == {"id": "vendor/chat:free", "name": "Chat", "context_length": 8000}
+    assert models[0] == {"id": "vendor/chat:free", "name": "Chat", "context_length": 8000, "images": False}
 
 
 def test_unknown_endpoint_uses_the_error_shape(client):
