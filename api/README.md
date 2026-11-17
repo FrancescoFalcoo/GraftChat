@@ -24,6 +24,10 @@ During frontend development run `npm run dev` in `web/` instead: Vite proxies `/
 | `GRAFTCHAT_FAKE_LLM` | `1` = canned local answers, no key, no network | off |
 | `OPENROUTER_API_KEY` | overrides the key saved from the UI | – |
 
+Each can also be set in a `.env` file at the repository root ([.env.example](../.env.example));
+a variable already set in the shell wins. To set up and start everything at once, use
+`python start.py` at the root.
+
 The server binds to `127.0.0.1` only: it has no authentication and it holds the API key.
 
 ## Files

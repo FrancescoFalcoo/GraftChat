@@ -1,6 +1,8 @@
 # Letting other people try GraftChat
 
-**Status:** proposal, 2026-11-17. Nothing here is implemented yet.
+**Status:** proposal, 2026-11-17. Done since: `python start.py` (one command from a clone,
+step 1 without PyPI), release zips with the interface built (no Node needed), "Connect
+OpenRouter" (step 2) and the key check. Still open: PyPI, single-file builds, steps 3 and 4.
 
 The goal: other people can try GraftChat with their own OpenRouter key, with as little setup
 as possible, without the author paying for their calls or holding their keys, and, if they

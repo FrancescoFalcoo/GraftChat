@@ -103,6 +103,12 @@ interface Settings {
   has_api_key: boolean;
   api_key_hint: string | null;     // e.g. "…a1b2", never the key itself
   api_key_from_env: boolean;       // true when OPENROUTER_API_KEY is set (the UI cannot change it)
+  key_info: {                      // what OpenRouter said when the key was last saved; null if not checked
+    label: string | null;
+    is_free_tier: boolean;         // the account never bought credits
+    free_daily_limit: number | null;     // requests per day to ":free" models
+    free_daily_remaining: number | null;
+  } | null;
   spend_cap_usd: number;           // 0 = free models only
   chat_model: string | null;
   takeaway_model: string | null;   // null = use chat_model
@@ -128,9 +134,20 @@ interface Model { id: string; name: string; context_length: number | null; image
 | GET | `/api/settings` | – | `Settings` |
 | PUT | `/api/settings` | any subset of `{ api_key, spend_cap_usd, chat_model, takeaway_model }` | `Settings` |
 | DELETE | `/api/settings/api-key` | – | `Settings` |
+| POST | `/api/oauth/start` | – | `{ url }`: OpenRouter's login page for this app |
+| GET | `/api/oauth/callback` | `?code&state` (from OpenRouter) | a redirect to `/?openrouter=connected` or `/?openrouter=error&message=…` |
 | GET | `/api/models` | – | `{ models: Model[] }` — free OpenRouter models; `provider_error` if the list cannot be fetched |
 
-`api_key: ""` is rejected (`validation`); use DELETE to remove the key.
+`api_key: ""` is rejected (`validation`); use DELETE to remove the key. A new key is checked
+with OpenRouter (`GET /api/v1/key`) before it is saved: a key OpenRouter rejects is refused
+(`validation`); if OpenRouter cannot be reached the key is saved unchecked (`key_info: null`).
+
+**Connect OpenRouter** (OAuth PKCE). `POST /api/oauth/start` creates a code verifier and a
+`state`, kept in memory for 10 minutes, and returns the OpenRouter URL with the S256 challenge
+and a `callback_url` back to `/api/oauth/callback` on this server. OpenRouter sends the browser
+there with a `code`; the server checks `state` (once only), exchanges the code for the user's
+key (`POST https://openrouter.ai/api/v1/auth/keys`), checks and saves it like a pasted key, and
+redirects to the app.
 `takeaway_model: null` clears it.
 
 ### Conversations

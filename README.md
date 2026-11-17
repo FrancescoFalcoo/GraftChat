@@ -43,29 +43,58 @@ to text on your computer and work with every model.
 
 ## Quick start
 
-Requirements: Python 3.11+ and Node 20.19+.
+You need **Python 3.11+** and, to build the interface the first time, **Node.js 20.19+**
+([python.org](https://www.python.org/downloads/), [nodejs.org](https://nodejs.org)).
 
 ```bash
 git clone https://github.com/FrancescoFalcoo/GraftChat.git
 cd GraftChat
-
-python -m venv .venv
-.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
-pip install -e ".[dev]"
-
-cd web && npm install && npm run build && cd ..
-
-python -m api                     # then open http://127.0.0.1:8000
+python start.py
 ```
 
-On first start, Settings asks for an [OpenRouter](https://openrouter.ai) API key, a monthly
-spend cap and a model (the list shows OpenRouter's free models).
+That is all. `start.py` creates a virtual environment in `.venv`, installs the backend, builds
+the interface, starts the server on `127.0.0.1` and opens your browser. Later runs skip what is
+already done, so `python start.py` is also how you start it every day. (On macOS and Linux
+the command may be `python3`.)
 
-To look around without a key or a network connection, start it with canned answers:
+No Node? Download the zip of the latest [release](https://github.com/FrancescoFalcoo/GraftChat/releases)
+instead of cloning: it contains the interface already built, so `python start.py` needs only
+Python.
+
+### Your key
+
+On the first start, Settings opens and asks for an [OpenRouter](https://openrouter.ai) key:
+
+- **Connect OpenRouter:** log in on OpenRouter and approve; you come back with a key, saved on
+  your computer. Nothing to copy.
+- **Or paste a key** made at [openrouter.ai/keys](https://openrouter.ai/keys). It is checked
+  with OpenRouter before it is saved.
+
+A good free model is already selected. Free models cost nothing; without credits on your
+OpenRouter account they allow **50 requests a day** (one per message, one or two more per
+take-away). Buying 10 credits once raises that to 1,000 a day. The spend cap starts at 0, which
+means free models only.
+
+### Options
 
 ```bash
-GRAFTCHAT_FAKE_LLM=1 python -m api          # PowerShell: $env:GRAFTCHAT_FAKE_LLM=1; python -m api
+python start.py --fake          # canned answers: try the interface with no key and no network
+python start.py --port 8100     # another port (by default the first free one from 8000)
+python start.py --no-browser    # do not open the browser
 ```
+
+The key can also live in a `.env` file at the root (copy [.env.example](.env.example)); a key
+set there or in `OPENROUTER_API_KEY` wins over the one saved from the UI.
+
+### If something goes wrong
+
+| What you see | What to do |
+|---|---|
+| "needs Python 3.11 or newer" | Install a newer Python and run `start.py` with it (`py -3.12 start.py` on Windows). |
+| "that needs Node.js" | Install Node.js 20.19+ and run it again, or use a release zip. |
+| "rate limited" or "50 requests" in an error | The daily free-model quota is used up: wait until tomorrow (UTC) or add credits on OpenRouter. |
+| "does not accept images" | Choose a model marked "images" in Settings. |
+| A model stops answering | Free models come and go on OpenRouter: pick another in Settings. |
 
 ## Privacy and cost
 
@@ -104,6 +133,7 @@ is in [DESIGN.md §11](docs/DESIGN.md#11-experiment-after-v1).
 | [`tests/`](tests/) | Unit tests for `core/`; integration tests for `api/` in `tests/backend/`. |
 | [`experiments/`](experiments/) | Experiment runner and evaluation (not started). |
 | [`devtools/`](devtools/) | Live preview of `core/` on a sample conversation. |
+| [`start.py`](start.py) | One-command setup and start (venv, install, build, run). |
 
 Documentation:
 
@@ -116,6 +146,7 @@ Documentation:
 ## Development
 
 ```bash
+pip install -e ".[dev]"           # in the venv: the backend plus the test tools
 python -m api                     # backend on http://127.0.0.1:8000
 cd web && npm run dev             # frontend on http://127.0.0.1:5173, proxies /api to the backend
 
