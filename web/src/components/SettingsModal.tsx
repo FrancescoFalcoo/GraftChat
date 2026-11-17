@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { api } from "../api";
 import type { Model, Settings, SettingsUpdate } from "../types";
 import { isSoundOn, playGlop, setSoundOn } from "../sound";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { Modal } from "./Modal";
 
 interface Props {
@@ -56,6 +57,7 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
   const [apiKey, setApiKey] = useState("");
   const [cap, setCap] = useState(String(settings.spend_cap_usd));
   const [sound, setSound] = useState(isSoundOn());
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [chatModel, setChatModel] = useState(settings.chat_model ?? "");
   const [sameAsChat, setSameAsChat] = useState(settings.takeaway_model === null);
   const [takeawayModel, setTakeawayModel] = useState(settings.takeaway_model ?? "");
@@ -100,7 +102,7 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
   };
 
   const removeKey = async (): Promise<void> => {
-    if (!window.confirm("Remove the stored API key?")) return;
+    setConfirmRemove(false);
     try {
       onSaved(await api.deleteApiKey());
     } catch (err) {
@@ -140,7 +142,7 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
               {settings.has_api_key && (
                 <p className="field-note">
                   Current key: {settings.api_key_hint ?? "set"}{" "}
-                  <button type="button" className="link-btn" onClick={() => void removeKey()}>
+                  <button type="button" className="link-btn" onClick={() => setConfirmRemove(true)}>
                     Remove
                   </button>
                 </p>
@@ -225,6 +227,16 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
           </button>
         </div>
       </form>
+      {confirmRemove && (
+        <ConfirmDialog
+          title="Remove the API key?"
+          message="The stored OpenRouter key will be deleted from this computer. Chats will stop until you add a key again."
+          confirmLabel="Remove"
+          danger
+          onCancel={() => setConfirmRemove(false)}
+          onConfirm={() => void removeKey()}
+        />
+      )}
     </Modal>
   );
 }

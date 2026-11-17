@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useAnchorClicks } from "../hooks/useAnchorClicks";
 import { useAnchorHighlights } from "../hooks/useAnchorHighlights";
 import { useFreshIds } from "../hooks/useFreshIds";
-import { branchColors, branchNumber } from "../lanes";
+import { laneOf } from "../lanes";
 import type { PendingRequest } from "../hooks/useGraft";
 import type { AnchorSelection } from "../selection";
 import type { Branch, ConversationState, Message } from "../types";
@@ -58,9 +58,7 @@ export function MainChat({
 
   const byAnchor = useMemo(() => groupBy(branches, (b) => b.anchor_message_id), [branches]);
   const byMerge = useMemo(() => groupBy(branches, (b) => b.merge_message_id), [branches]);
-  const colors = useMemo(() => branchColors(branches), [branches]);
-  const colorOf = useCallback((id: number) => colors.get(id) ?? "", [colors]);
-  const numberOf = useCallback((id: number) => branchNumber(branches, id), [branches]);
+  const laneOfId = useCallback((id: number) => laneOf(branches, id), [branches]);
   const conversationKey = state?.conversation.id ?? null;
   const freshBranches = useFreshIds(conversationKey, branches.map((b) => b.id));
   // A merge may reuse the last merge node: what is new is the merged branch.
@@ -95,20 +93,13 @@ export function MainChat({
       : "Message GraftChat";
 
   const renderMerge = (m: Message): ReactNode => (
-    <MergeNode
-      branches={byMerge.get(m.id) ?? []}
-      colorOf={colorOf}
-      numberOf={numberOf}
-      fresh={freshMerged}
-      onOpenBranch={onShowBranch}
-    />
+    <MergeNode branches={byMerge.get(m.id) ?? []} laneOf={laneOfId} fresh={freshMerged} onOpenBranch={onShowBranch} />
   );
   const renderBelow = (m: Message): ReactNode => (
     <AnchorChips
       branches={byAnchor.get(m.id) ?? []}
       activeBranchId={activeBranchId}
-      colorOf={colorOf}
-      numberOf={numberOf}
+      laneOf={laneOfId}
       fresh={freshBranches}
       onOpenBranch={onShowBranch}
     />

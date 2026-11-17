@@ -1,15 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PendingRequest } from "../hooks/useGraft";
-import { branchProps, plainQuote } from "../lanes";
+import { plainQuote } from "../lanes";
 import type { Branch } from "../types";
 import { Composer } from "./Composer";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ForkIcon } from "./Marks";
 import { isAwaitingReply, ThreadView } from "./ThreadView";
 
 interface Props {
   branch: Branch;
-  /** Colour of the branch (lanes.ts): the rail down the panel's left edge. */
-  color: string;
+  /** Lane colour of the branch (lanes.ts): the rail down the panel's left edge. */
+  lane: number;
   pending: PendingRequest | null;
   onClose: () => void;
   onSend: (text: string) => Promise<boolean>;
@@ -27,7 +28,7 @@ const STATUS_WORD: Record<Branch["status"], string> = {
 
 export function BranchPanel({
   branch,
-  color,
+  lane,
   pending,
   onClose,
   onSend,
@@ -46,26 +47,34 @@ export function BranchPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, [branch.id, branch.messages.length, pending]);
 
-  const discard = (): void => {
-    const question = empty
-      ? "Discard this branch?"
-      : "Discard this branch? Its messages will never enter the main conversation.";
-    if (window.confirm(question)) onDiscard();
-  };
+  const [confirming, setConfirming] = useState(false);
+  // A new branch: the composer sits right under the hint, where one starts typing.
+  const fresh = isOpen && empty && !pending;
+
+  const composer = (
+    <Composer
+      key={branch.id}
+      label="Message in this branch"
+      placeholder={
+        pending
+          ? "Waiting for the reply…"
+          : awaiting
+            ? "Retry or delete the last message to continue"
+            : "Ask about this passage"
+      }
+      disabled={pending !== null || awaiting}
+      onSend={onSend}
+    />
+  );
 
   return (
-    <aside
-      className="panel"
-      aria-label="Branch"
-      {...branchProps(color, branch.id)}
-      data-status={branch.status}
-    >
+    <aside className="panel" aria-label="Branch" data-lane={lane} data-status={branch.status}>
       <header className="panel-head">
         <div className="panel-title">
           <h2>
             <ForkIcon /> Branch
           </h2>
-          <span className={`status status-${branch.status}`}>{STATUS_WORD[branch.status]}</span>
+          <span className={`pill pill-${branch.status}`}>{STATUS_WORD[branch.status]}</span>
           <button type="button" className="btn btn-small panel-close" onClick={onClose}>
             Close
           </button>
@@ -84,7 +93,7 @@ export function BranchPanel({
             >
               Merge…
             </button>
-            <button type="button" className="btn btn-small btn-danger" onClick={discard}>
+            <button type="button" className="btn btn-small btn-danger" onClick={() => setConfirming(true)}>
               Discard
             </button>
           </div>
@@ -100,36 +109,47 @@ export function BranchPanel({
           onRetry={onRetry}
           onDelete={onDelete}
           emptyHint={
-            <p className="muted">
-              {isOpen
-                ? "Ask about the quoted passage. This side conversation stays out of the main context until you merge it."
-                : "This branch has no messages."}
-            </p>
+            <>
+              <p className="muted">
+                {isOpen
+                  ? "Ask about the quoted passage. This side conversation stays out of the main context until you merge it."
+                  : "This branch has no messages."}
+              </p>
+              {fresh && <div className="panel-first-composer">{composer}</div>}
+            </>
           }
         />
       </div>
 
-      <div className="panel-foot">
-        {isOpen ? (
-          <Composer
-            key={branch.id}
-            label="Message in this branch"
-            placeholder={
-              pending
-                ? "Waiting for the reply…"
-                : awaiting
-                  ? "Retry or delete the last message to continue"
-                  : "Ask about this passage"
-            }
-            disabled={pending !== null || awaiting}
-            onSend={onSend}
-          />
-        ) : (
-          <p className="panel-closed-note">
-            {branch.status === "merged" ? "This branch was merged." : "This branch was discarded."}
-          </p>
-        )}
-      </div>
+      {!fresh && (
+        <div className="panel-foot">
+          {isOpen ? (
+            composer
+          ) : (
+            <p className="panel-closed-note">
+              {branch.status === "merged" ? "This branch was merged." : "This branch was discarded."}
+            </p>
+          )}
+        </div>
+      )}
+
+      {confirming && (
+        <ConfirmDialog
+          title="Discard this branch?"
+          message={
+            empty
+              ? "The branch will be closed. You can still see it on the map."
+              : "Its messages will never enter the main conversation. You can still read them later."
+          }
+          confirmLabel="Discard"
+          danger
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            onDiscard();
+          }}
+        />
+      )}
     </aside>
   );
 }

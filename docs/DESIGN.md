@@ -48,7 +48,7 @@ In:
 - Return-to-main warning.
 - Conversation map: the current conversation drawn as a graph. Main is a vertical trunk with one node per prompt and per merge; each branch leaves the trunk at its anchor in its own colour, with one node per prompt, and merged branches come back into the trunk at their merge node. Nodes are labelled by the first words of the prompt; clicking one shows that prompt.
 - Anchored passages are clickable: under the pointer they show that they open their branch, and a click opens it in the side panel.
-- Interface: one dark warm theme (anthracite surfaces, neon yellow as the only accent), the user's messages on the right; each branch has its own colour, assigned in creation order within the conversation, used everywhere the branch appears. Opening a branch and merging play a short synthesised sound and a brief animation (the sound can be switched off in Settings).
+- Interface: green-ink theme (light and dark, following the system), serif for the model's answers; the user's messages on the right; the main column widens and centres when no branch is open. Each branch has its own lane colour, used everywhere the branch appears. A new branch puts its composer right under the hint; confirmations use the app's own dialog. Opening a branch and merging play a short synthesised sound and a brief animation (the sound can be switched off in Settings).
 - Logging of every LLM call (for the experiment).
 
 Out (v2 backlog, §10):

@@ -13,21 +13,17 @@ body,
 body {
   margin: 0;
   overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.5 var(--sans);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-m);
+  line-height: var(--lh-ui);
+  font-kerning: normal;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--neon);
-  color: var(--bg);
-}
-
-code,
-pre,
-kbd {
-  font-family: var(--mono);
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
 h1,
@@ -41,6 +37,7 @@ h1,
 h2,
 h3 {
   font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
 button,
@@ -52,12 +49,12 @@ select {
 }
 
 :focus-visible {
-  outline: 2px solid var(--neon);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .sr-only {
@@ -80,7 +77,7 @@ select {
   gap: var(--space-2);
   min-height: var(--hit);
   padding: 0 var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-s);
   background: transparent;
   font-size: var(--text-m);
@@ -90,8 +87,7 @@ select {
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--surface);
-  box-shadow: 0 0 0 1px var(--neon);
+  background: var(--wash);
 }
 
 .btn:disabled {
@@ -100,25 +96,23 @@ select {
 }
 
 .btn-primary {
-  border-color: var(--neon);
-  background: var(--neon);
-  color: var(--bg);
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
   font-weight: 600;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--neon);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--neon) 40%, transparent);
+  background: color-mix(in srgb, var(--ink) 86%, var(--ground));
 }
 
 .btn-danger {
-  border-color: color-mix(in srgb, var(--err) 35%, transparent);
-  color: var(--err);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--danger);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--err) 8%, transparent);
-  box-shadow: 0 0 0 1px var(--err);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .btn-small {
@@ -140,25 +134,25 @@ select {
   border: none;
   border-radius: var(--radius-s);
   background: transparent;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--wash);
+  color: var(--ink);
 }
 
 .link-btn {
   padding: 0;
   border: none;
   background: none;
-  color: var(--text);
+  color: var(--ink);
   font-weight: 500;
   text-decoration: underline;
-  text-decoration-color: var(--neon);
+  text-decoration-color: var(--edge);
   text-underline-offset: 3px;
   cursor: pointer;
 }
@@ -187,8 +181,8 @@ select {
   width: 14px;
   height: 14px;
   flex: none;
-  border: 2px solid var(--border);
-  border-top-color: var(--neon);
+  border: 2px solid var(--rule);
+  border-top-color: var(--ink);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
@@ -205,33 +199,13 @@ select {
   }
 }
 
-/* Status badges (chips, side panel): merged = neon, open = neon outline, discarded = muted. */
-.status {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: 11px;
+/* Status word: plain text, sentence case. */
+.pill {
+  color: var(--ink-soft);
+  font-size: var(--text-s);
   font-weight: 500;
-  line-height: 16px;
-  white-space: nowrap;
 }
 
-.status-merged {
-  background: var(--neon);
-  color: var(--bg);
-  font-weight: 600;
+.pill-discarded {
+  text-decoration: line-through;
 }
-
-.status-open {
-  background: transparent;
-  color: var(--neon);
-  box-shadow: inset 0 0 0 1px var(--neon);
-}
-
-/* Every element of the branch under the pointer (hooks/useLinkedBranches.ts). */
-.branch-linked {
-  box-shadow: 0 0 0 2px var(--c) !important;
-}
-

@@ -1,5 +1,5 @@
-import { playGlop } from "./sound";
 import { useState } from "react";
+import { playGlop } from "./sound";
 import { BranchPanel } from "./components/BranchPanel";
 import { ConversationMap } from "./components/ConversationMap";
 import { MainChat } from "./components/MainChat";
@@ -8,8 +8,7 @@ import { DevNotice, ReturnBanner, Toasts } from "./components/Notices";
 import { SettingsModal } from "./components/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
 import { useGraft } from "./hooks/useGraft";
-import { useLinkedBranches } from "./hooks/useLinkedBranches";
-import { branchColor } from "./lanes";
+import { laneOf } from "./lanes";
 import { pendingBranches } from "./util";
 
 export function App() {
@@ -18,7 +17,6 @@ export function App() {
   const panelBranch = state?.branches.find((b) => b.id === g.panelBranchId) ?? null;
   const pendingCount = state ? pendingBranches(state).length : 0;
   const [mapOpen, setMapOpen] = useState(false);
-  useLinkedBranches();
 
   /** From the map: show the prompt, opening its branch in the side panel if needed. */
   const jumpTo = (messageId: number, branchId: number | null): void => {
@@ -76,7 +74,7 @@ export function App() {
         {panelBranch && (
           <BranchPanel
             branch={panelBranch}
-            color={branchColor(state?.branches ?? [], panelBranch.id)}
+            lane={laneOf(state?.branches ?? [], panelBranch.id)}
             pending={g.pendingFor(panelBranch.id)}
             onClose={g.closePanel}
             onSend={(text) => g.sendMessage(panelBranch.id, text)}

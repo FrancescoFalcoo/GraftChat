@@ -59,7 +59,7 @@ export function Sidebar({
               <span className="conv-title">{c.title}</span>
               {c.open_branches > 0 && (
                 <span
-                  className="conv-badge"
+                  className="badge"
                   title={`${c.open_branches} open branch${c.open_branches === 1 ? "" : "es"}`}
                 >
                   {c.open_branches}

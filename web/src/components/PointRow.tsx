@@ -68,7 +68,7 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
   const edited = point.text_final !== point.text_generated;
 
   return (
-    <li className={`tk-point ${point.included ? "tk-point-on" : "tk-point-off"}`}>
+    <li className={`point${point.included ? "" : " point-excluded"}`}>
       <div className="point-head">
         <label className="point-check">
           <input
@@ -79,11 +79,7 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
           />
           <span className="point-title">{point.title}</span>
         </label>
-        {edited && (
-          <span className="point-edited" title={point.text_generated}>
-            Edited
-          </span>
-        )}
+        {edited && <span className="point-edited">Edited</span>}
         <button
           type="button"
           className="icon-btn chevron"

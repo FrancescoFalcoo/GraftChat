@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { findRootByMessageId, offsetsToRange } from "../selection";
-import { branchColors } from "../lanes";
+import { LANE_COUNT } from "../lanes";
 import type { ConversationState } from "../types";
 
 // Minimal typings for the CSS Custom Highlight API, so the code does not depend on
@@ -8,7 +8,13 @@ import type { ConversationState } from "../types";
 type HighlightRegistry = Map<string, unknown>;
 type HighlightCtor = new (...ranges: Range[]) => unknown;
 
-const STYLE_ID = "graft-highlight-rules";
+const KINDS = ["open", "merged", "discarded", "active"] as const;
+
+/** Every highlight name: one per lane and status (`graft-l0-open` …), "active" = in the panel. */
+const NAMES: string[] = [];
+for (let lane = 0; lane < LANE_COUNT; lane++) {
+  for (const kind of KINDS) NAMES.push(`graft-l${lane}-${kind}`);
+}
 
 function highlightApi(): { registry: HighlightRegistry; Highlight: HighlightCtor } | null {
   if (typeof CSS === "undefined") return null;
@@ -17,45 +23,10 @@ function highlightApi(): { registry: HighlightRegistry; Highlight: HighlightCtor
   return registry && typeof Highlight === "function" ? { registry, Highlight } : null;
 }
 
-/** Highlight name of a branch's passage: `graft-b12` (status tint), `-active`, `-hover`. */
-export function highlightName(branchId: number, kind: "" | "active" | "hover" = ""): string {
-  return kind ? `graft-b${branchId}-${kind}` : `graft-b${branchId}`;
-}
-
-const tint = (color: string, pct: number): string =>
-  `color-mix(in srgb, ${color} ${pct}%, transparent)`;
-
 /**
- * `::highlight()` rules cannot read per-element custom properties, so each branch gets
- * its own rules, generated from its colour: open = 20% tint + 2px underline; merged =
- * underline only; discarded = dashed muted underline; active (in the side panel) and
- * hover are stronger.
- */
-export function highlightRules(state: ConversationState): string {
-  const colors = branchColors(state.branches);
-  const rules: string[] = [];
-  for (const b of state.branches) {
-    const c = colors.get(b.id)!;
-    const name = highlightName(b.id);
-    if (b.status === "open") {
-      rules.push(`::highlight(${name}) { background-color: ${tint(c, 20)}; text-decoration: underline solid ${c} 2px; }`);
-    } else if (b.status === "merged") {
-      rules.push(`::highlight(${name}) { text-decoration: underline solid ${c} 2px; }`);
-    } else {
-      rules.push(`::highlight(${name}) { text-decoration: underline dashed var(--muted) 1px; }`);
-    }
-    rules.push(
-      `::highlight(${highlightName(b.id, "active")}) { background-color: ${tint(c, 34)}; text-decoration: underline solid ${c} 2px; }`,
-      `::highlight(${highlightName(b.id, "hover")}) { background-color: ${tint(c, 45)}; text-decoration: underline solid ${c} 3px; }`,
-    );
-  }
-  return rules.join("\n");
-}
-
-/**
- * Tints the anchored passages of main with the CSS Custom Highlight API, one highlight
- * per branch in its own colour. Progressive enhancement: does nothing where the API is
- * missing; the chips under each message carry the same information.
+ * Tints the anchored passages of main with the CSS Custom Highlight API
+ * (`::highlight(graft-l0-open)` etc., in markdown.css). Progressive enhancement: does nothing where the
+ * API is missing; the chips under each message carry the same information.
  */
 export function useAnchorHighlights(
   scopeRef: RefObject<HTMLElement>,
@@ -67,28 +38,27 @@ export function useAnchorHighlights(
     const scope = scopeRef.current;
     if (!hl || !scope || !state) return;
 
-    let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
-    if (!style) {
-      style = document.createElement("style");
-      style.id = STYLE_ID;
-      document.head.appendChild(style);
-    }
-    style.textContent = highlightRules(state);
-
+    const ranges = new Map<string, Range[]>();
     const contents = new Map(state.main.map((m) => [m.id, m.content]));
-    const names: string[] = [];
-    for (const branch of state.branches) {
+    state.branches.forEach((branch, index) => {
       const content = contents.get(branch.anchor_message_id);
       const root = findRootByMessageId(scope, branch.anchor_message_id);
-      if (content === undefined || !root) continue;
+      if (content === undefined || !root) return;
       const range = offsetsToRange(root, content, branch.anchor_start, branch.anchor_end);
-      if (!range) continue;
-      const name = highlightName(branch.id, branch.id === activeBranchId ? "active" : "");
-      hl.registry.set(name, new hl.Highlight(range));
-      names.push(name);
+      if (!range) return;
+      const kind = branch.id === activeBranchId ? "active" : branch.status;
+      const name = `graft-l${index % LANE_COUNT}-${kind}`;
+      const list = ranges.get(name);
+      if (list) list.push(range);
+      else ranges.set(name, [range]);
+    });
+    for (const name of NAMES) {
+      const list = ranges.get(name);
+      if (list) hl.registry.set(name, new hl.Highlight(...list));
+      else hl.registry.delete(name);
     }
     return () => {
-      for (const name of names) hl.registry.delete(name);
+      for (const name of NAMES) hl.registry.delete(name);
     };
   }, [scopeRef, state, activeBranchId]);
 }

@@ -15,11 +15,10 @@
   flex-direction: column;
   width: min(520px, 100%);
   max-height: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-l);
+  background: var(--surface);
   box-shadow: var(--shadow-float);
-  overflow: hidden;
 }
 
 .modal:focus {
@@ -35,20 +34,18 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
-  border-bottom: 1px solid var(--neon);
-  background: var(--surface-2);
+  padding: var(--space-4) var(--space-3) var(--space-2) var(--space-5);
 }
 
 .modal-head h2 {
-  color: var(--neon);
-  font-size: 16px;
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
 }
 
 .modal-body {
   flex: 1;
   min-height: 0;
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  padding: var(--space-1) var(--space-5) var(--space-5);
   overflow-y: auto;
 }
 
@@ -59,14 +56,13 @@
   justify-content: flex-end;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--border);
-  background: var(--surface-2);
+  border-top: 1px solid var(--rule);
 }
 
 .modal-hint {
   flex: 1;
   min-width: 12em;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: var(--text-s);
 }
 
@@ -89,24 +85,24 @@
   width: 100%;
   min-height: 36px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-s);
-  background: var(--surface);
+  background: var(--ground);
 }
 
 .field input:focus-visible {
   outline: none;
-  border-color: var(--neon);
-  box-shadow: 0 0 0 1px var(--neon);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 .field input::placeholder {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .field input[readonly] {
-  background: var(--surface-2);
-  color: var(--muted);
+  background: var(--wash);
+  color: var(--ink-soft);
 }
 
 .field .check-label {
@@ -119,27 +115,24 @@
   cursor: pointer;
 }
 
-.check-label input {
+.check-label input,
+.point-check input {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   margin: 0;
-  accent-color: var(--neon);
+  accent-color: var(--ink);
 }
 
 .field-note {
   margin-top: var(--space-1);
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: var(--text-s);
 }
 
 .form-error {
-  padding: var(--space-2) 10px;
-  border: 1px solid color-mix(in srgb, var(--err) 35%, transparent);
-  border-radius: var(--radius-s);
-  background: color-mix(in srgb, var(--err) 8%, transparent);
-  color: var(--err);
-  font: 600 13px var(--mono);
+  color: var(--danger);
+  font-weight: 500;
 }
 
 .form-actions {
@@ -148,52 +141,56 @@
   gap: var(--space-2);
 }
 
-/* Merge dialog: one card per branch, its colour down the left edge. */
+/* Merge dialog: one block per branch, its tape down the left edge. */
 .merge-intro {
   max-width: 34em;
   margin-bottom: var(--space-4);
 }
 
 .merge-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--c);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: box-shadow 0.15s;
+  position: relative;
+  margin-bottom: var(--space-4);
+  padding: var(--space-1) 0 var(--space-1) calc(var(--tape-w) + var(--space-4));
 }
 
-.merge-card:hover {
-  box-shadow: 0 0 0 1px var(--neon);
+.merge-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: var(--tape-w) var(--lane-style) var(--lane);
+  border-radius: var(--radius-tape);
 }
 
-.merge-card-later {
-  border-left-color: color-mix(in srgb, var(--c) 45%, transparent);
+.merge-card-later::before {
+  opacity: 0.45;
 }
 
-.merge-card-discard {
-  opacity: 0.62;
-  border-left-style: dashed;
+.merge-card + .merge-card {
+  padding-top: var(--space-4);
+}
+
+.merge-card + .merge-card::before {
+  top: var(--space-3);
 }
 
 .merge-quote {
   max-height: 5em;
-  margin: 0;
-  padding: 4px 10px;
+  margin: 0 0 var(--space-2);
   overflow-y: auto;
-  border-left: 3px solid var(--c);
-  border-radius: 0 6px 6px 0;
-  background: color-mix(in srgb, var(--c) 8%, transparent);
+  font-family: var(--font-read);
+  font-size: var(--text-m);
   font-style: italic;
+  line-height: 1.55;
+  text-decoration: underline solid var(--lane) 2px;
+  text-underline-offset: 4px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .merge-card-discard .merge-quote {
+  color: var(--ink-soft);
   text-decoration: line-through;
 }
 
@@ -207,16 +204,16 @@
 }
 
 .merge-card-note {
-  color: var(--muted);
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
 }
 
 .segmented {
   display: inline-flex;
   margin: 0;
   padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
 }
 
 .segment {
@@ -225,7 +222,7 @@
   align-items: center;
   min-height: 28px;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-tape);
   font-size: var(--text-s);
   font-weight: 500;
   cursor: pointer;
@@ -233,7 +230,7 @@
 }
 
 .segment:hover:not(.segment-on):not(.segment-disabled) {
-  background: var(--surface-2);
+  background: var(--wash);
 }
 
 .segment input {
@@ -245,8 +242,8 @@
 }
 
 .segment-on {
-  background: var(--neon);
-  color: var(--bg);
+  background: var(--ink);
+  color: var(--on-ink);
   font-weight: 600;
 }
 
@@ -256,13 +253,12 @@
 }
 
 .segment:focus-within {
-  outline: 2px solid var(--neon);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 .takeaway {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  margin-top: var(--space-3);
 }
 
 .takeaway-status {
@@ -277,18 +273,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) 10px;
-  border: 1px solid color-mix(in srgb, var(--err) 35%, transparent);
-  border-radius: var(--radius-s);
-  background: color-mix(in srgb, var(--err) 8%, transparent);
+  color: var(--danger);
 }
 
 .takeaway-error p {
   flex: 1;
   min-width: 12em;
-  color: var(--err);
-  font: 600 13px var(--mono);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
@@ -308,17 +298,12 @@
   list-style: none;
 }
 
-/* Take-away checklist: a 16px box in the branch colour, filled with a check when on. */
-.tk-point {
+.point {
   border-radius: var(--radius-s);
 }
 
-.tk-point:hover {
-  background: color-mix(in srgb, var(--c) 6%, transparent);
-}
-
-.tk-point-off .point-head {
-  opacity: 0.55;
+.point:hover {
+  background: var(--wash);
 }
 
 .point-head {
@@ -332,7 +317,7 @@
   display: flex;
   flex: 1;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
   min-height: var(--hit);
   padding: var(--space-1) 0;
@@ -340,53 +325,24 @@
 }
 
 .point-check input {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  border: 1.5px solid var(--c);
-  border-radius: 4px;
-  background: transparent;
-  appearance: none;
-  cursor: inherit;
-}
-
-.point-check input:checked {
-  background: var(--c);
-}
-
-.point-check input:checked::after {
-  content: "\2713";
-  color: var(--surface-2);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.point-check input:focus-visible {
-  outline: 2px solid var(--neon);
-  outline-offset: 2px;
+  accent-color: var(--lane-ink);
 }
 
 .point-title {
   min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-/* The "Edited" pill: the original generated text is in its title. */
+.point-excluded .point-title {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
 .point-edited {
   flex: none;
-  padding: 0 7px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 500;
-  cursor: help;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-style: italic;
 }
 
 .chevron svg {
@@ -402,7 +358,7 @@
 }
 
 .point-body {
-  padding: var(--space-1) var(--space-2) var(--space-3) calc(16px + var(--space-2) + var(--space-2));
+  padding: var(--space-1) var(--space-2) var(--space-3) calc(18px + var(--space-2) + var(--space-3));
   animation: row-open 0.16s ease-out;
 }
 
@@ -417,17 +373,17 @@
   display: block;
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-s);
-  background: var(--surface-2);
-  line-height: var(--lh);
+  background: var(--surface);
+  line-height: var(--lh-ui);
   resize: vertical;
 }
 
 .point-body textarea:focus-visible {
   outline: none;
-  border-color: var(--neon);
-  box-shadow: 0 0 0 1px var(--neon);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 .point-meta {
@@ -449,7 +405,7 @@
   .modal,
   .modal-wide {
     width: 100%;
-    border-radius: var(--radius) var(--radius) 0 0;
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
   }
 
   .modal-head,
@@ -464,4 +420,21 @@
   .point-body {
     animation: none;
   }
+}
+
+/* Confirmations (discard a branch, remove the key, regenerate) in the app's own dialog. */
+.confirm-text {
+  line-height: var(--lh-ui);
+}
+
+.btn-danger-solid,
+.btn-danger-solid:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-ink);
+  font-weight: 600;
+}
+
+.btn-danger-solid:hover:not(:disabled) {
+  filter: brightness(1.08);
 }

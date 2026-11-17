@@ -2,6 +2,8 @@
  * Message rendering. The DOM text is exactly the raw message (see markdown.ts), so
  * nothing here may add or remove text: no ::before/::after content inside a message,
  * markers are hidden with display:none and stay in the DOM.
+ *
+ * The reading face (Literata) is the model's voice: answers and quotes of answers only.
  */
 .md {
   white-space: pre-wrap;
@@ -9,7 +11,11 @@
 }
 
 .msg-assistant .md {
-  line-height: var(--lh);
+  max-width: var(--measure);
+  font-family: var(--font-read);
+  font-size: var(--text-l);
+  line-height: var(--lh-read);
+  font-optical-sizing: auto;
 }
 
 .md .ln {
@@ -22,7 +28,7 @@
 }
 
 .md .lm {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .md .ln-blank {
@@ -65,23 +71,23 @@
 
 .md .ln-bq {
   padding-left: var(--space-3);
-  border-left: 2px solid var(--border);
-  color: var(--muted);
+  border-left: 2px solid var(--rule);
+  color: var(--ink-soft);
   font-style: italic;
 }
 
 .md code {
   padding: 0.05em 0.3em;
-  border-radius: 4px;
-  background: var(--surface-2);
-  font-family: var(--mono);
+  border-radius: var(--radius-tape);
+  background: var(--wash);
+  font-family: var(--font-code);
   font-size: 0.84em;
 }
 
 .md .cb {
   padding: 0 var(--space-3);
-  background: var(--surface-2);
-  font-family: var(--mono);
+  background: var(--wash);
+  font-family: var(--font-code);
   font-size: 0.8em;
   line-height: 1.6;
 }
@@ -108,10 +114,150 @@
 }
 
 .md .ln-fence {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 /*
- * Anchored passages are drawn with the CSS Custom Highlight API: the ::highlight() rules
- * are generated per branch, in its colour (hooks/useAnchorHighlights.ts).
+ * Anchored passages (CSS Custom Highlight API, see useAnchorHighlights.ts), one name per
+ * lane and status. Only colour, background and text-decoration work in ::highlight.
+ * open = tint + solid underline; merged = underline only; discarded = grey dashed
+ * underline; active (open in the side panel) = stronger tint.
  */
+::highlight(graft-l0-open) {
+  background-color: var(--lane-0-tint);
+  text-decoration: underline solid var(--lane-0) 2px;
+}
+
+::highlight(graft-l0-merged) {
+  text-decoration: underline solid var(--lane-0) 2px;
+}
+
+::highlight(graft-l0-discarded) {
+  text-decoration: underline dashed var(--ink-soft) 1px;
+}
+
+::highlight(graft-l0-active) {
+  background-color: var(--lane-0-tint-strong);
+  text-decoration: underline solid var(--lane-0) 2px;
+}
+
+::highlight(graft-l1-open) {
+  background-color: var(--lane-1-tint);
+  text-decoration: underline solid var(--lane-1) 2px;
+}
+
+::highlight(graft-l1-merged) {
+  text-decoration: underline solid var(--lane-1) 2px;
+}
+
+::highlight(graft-l1-discarded) {
+  text-decoration: underline dashed var(--ink-soft) 1px;
+}
+
+::highlight(graft-l1-active) {
+  background-color: var(--lane-1-tint-strong);
+  text-decoration: underline solid var(--lane-1) 2px;
+}
+
+::highlight(graft-l2-open) {
+  background-color: var(--lane-2-tint);
+  text-decoration: underline solid var(--lane-2) 2px;
+}
+
+::highlight(graft-l2-merged) {
+  text-decoration: underline solid var(--lane-2) 2px;
+}
+
+::highlight(graft-l2-discarded) {
+  text-decoration: underline dashed var(--ink-soft) 1px;
+}
+
+::highlight(graft-l2-active) {
+  background-color: var(--lane-2-tint-strong);
+  text-decoration: underline solid var(--lane-2) 2px;
+}
+
+::highlight(graft-l3-open) {
+  background-color: var(--lane-3-tint);
+  text-decoration: underline solid var(--lane-3) 2px;
+}
+
+::highlight(graft-l3-merged) {
+  text-decoration: underline solid var(--lane-3) 2px;
+}
+
+::highlight(graft-l3-discarded) {
+  text-decoration: underline dashed var(--ink-soft) 1px;
+}
+
+::highlight(graft-l3-active) {
+  background-color: var(--lane-3-tint-strong);
+  text-decoration: underline solid var(--lane-3) 2px;
+}
+
+::highlight(graft-l4-open) {
+  background-color: var(--lane-4-tint);
+  text-decoration: underline solid var(--lane-4) 2px;
+}
+
+::highlight(graft-l4-merged) {
+  text-decoration: underline solid var(--lane-4) 2px;
+}
+
+::highlight(graft-l4-discarded) {
+  text-decoration: underline dashed var(--ink-soft) 1px;
+}
+
+::highlight(graft-l4-active) {
+  background-color: var(--lane-4-tint-strong);
+  text-decoration: underline solid var(--lane-4) 2px;
+}
+
+::highlight(graft-l5-open) {
+  background-color: var(--lane-5-tint);
+  text-decoration: underline solid var(--lane-5) 2px;
+}
+
+::highlight(graft-l5-merged) {
+  text-decoration: underline solid var(--lane-5) 2px;
+}
+
+::highlight(graft-l5-discarded) {
+  text-decoration: underline dashed var(--ink-soft) 1px;
+}
+
+::highlight(graft-l5-active) {
+  background-color: var(--lane-5-tint-strong);
+  text-decoration: underline solid var(--lane-5) 2px;
+}
+
+/* An anchored passage under the pointer (useAnchorClicks.ts): it opens its branch on click. */
+::highlight(graft-l0-hover) {
+  background-color: var(--lane-0-tint-strong);
+  text-decoration: underline solid var(--lane-0) 3px;
+}
+
+::highlight(graft-l1-hover) {
+  background-color: var(--lane-1-tint-strong);
+  text-decoration: underline solid var(--lane-1) 3px;
+}
+
+::highlight(graft-l2-hover) {
+  background-color: var(--lane-2-tint-strong);
+  text-decoration: underline solid var(--lane-2) 3px;
+}
+
+::highlight(graft-l3-hover) {
+  background-color: var(--lane-3-tint-strong);
+  text-decoration: underline solid var(--lane-3) 3px;
+}
+
+::highlight(graft-l4-hover) {
+  background-color: var(--lane-4-tint-strong);
+  text-decoration: underline solid var(--lane-4) 3px;
+}
+
+::highlight(graft-l5-hover) {
+  background-color: var(--lane-5-tint-strong);
+  text-decoration: underline solid var(--lane-5) 3px;
+}

@@ -1,12 +1,11 @@
 /*
  * The main column and the trunk.
  *
- * A thread is a column of turns: the user's turns are neon bubbles on the right, the
- * model's answers are surface bubbles on the left. The trunk is a thin line in the
- * gutter left of the column; each turn puts a node on it (user = neon ring, answer =
- * muted dot, merge = larger neon ring). A branch leaves the trunk as a short curved stub
- * in its colour next to its chip and comes back at a merge node. Everything is drawn
- * with borders and pseudo-elements outside the message text.
+ * A thread is a column of turns. The trunk is a thin line in the gutter left of the
+ * text; each turn puts a node on it (user = hollow ring, answer = filled dot, merge =
+ * larger ring). A branch leaves the trunk as a short curved stub next to its chip and
+ * comes back at a merge node. Everything is drawn with borders and pseudo-elements
+ * outside the message text, so it survives any message length and window size.
  */
 .chat {
   display: flex;
@@ -16,12 +15,8 @@
 }
 
 .chat-head {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  padding: var(--space-2) var(--col-pad);
-  border-bottom: 1px solid var(--neon);
-  background: var(--surface-2);
+  padding: var(--space-3) var(--col-pad);
+  border-bottom: 1px solid var(--rule);
 }
 
 .chat-head h1 {
@@ -40,22 +35,20 @@
   overflow-y: auto;
 }
 
+/* Left aligned: the column starts at the sidebar and stops at the reading measure. */
 .chat-col {
   width: 100%;
   max-width: calc(var(--measure) + var(--gutter) + 2 * var(--col-pad));
-  margin: 0 auto;
   padding: 0 var(--col-pad);
 }
 
 .chat-scroll .chat-col {
-  padding-top: var(--space-5);
+  padding-top: var(--space-6);
   padding-bottom: var(--space-6);
 }
 
 .chat-foot {
   padding: var(--space-2) 0 var(--space-3);
-  border-top: 1px solid var(--border);
-  background: var(--bg);
 }
 
 .chat-foot .chat-col {
@@ -78,13 +71,13 @@
   bottom: 0;
   left: calc(var(--axis) - var(--trunk-w) / 2);
   width: var(--trunk-w);
-  background: var(--border);
+  background: var(--trunk);
 }
 
 .turn {
   position: relative;
   min-width: 0;
-  --node-top: 18px;
+  --node-top: 14px;
 }
 
 .turn::before {
@@ -98,78 +91,67 @@
   border-radius: 50%;
 }
 
-/* Bubbles */
+/* The user's own turn: grotesk, on a wash band, hollow ring on the trunk. */
 .turn-user {
+  --node-top: 19px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--space-2);
 }
 
 .turn-user::before {
-  border: 2px solid var(--neon);
-  background: var(--bg);
+  border: 2px solid var(--node-color);
+  background: var(--node-fill);
 }
 
 .user-text {
-  max-width: 85%;
+  max-width: var(--measure);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius) var(--radius) 4px var(--radius);
-  background: var(--user);
-  color: var(--user-text);
+  border-radius: var(--radius-s);
+  background: var(--wash);
+  font-weight: 500;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.user-text::selection {
-  background: var(--bg);
-  color: var(--neon);
 }
 
 .msg-optimistic .user-text {
   opacity: 0.65;
 }
 
-.turn-assistant::before {
-  background: var(--muted);
+/* The model's answer: Literata (markdown.css), filled dot on the trunk. */
+.turn-assistant {
+  --node-top: 13.6px;
 }
 
-/* The answer bubble is the rendered message itself (padding only, no added text). */
-.msg-assistant > .md {
-  width: fit-content;
-  max-width: 85%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius) var(--radius) var(--radius) 4px;
-  background: var(--surface);
+.turn-assistant::before {
+  background: var(--node-color);
 }
 
 .turn-thinking {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 36px;
-  color: var(--muted);
+  min-height: 27px;
+  color: var(--ink-soft);
 }
 
 .turn-thinking::before {
-  border: 2px solid var(--muted);
-  background: var(--bg);
+  border: 2px solid var(--trunk);
+  background: var(--node-fill);
 }
 
 .dangling {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--space-2);
   font-size: var(--text-s);
 }
 
 .dangling-note {
-  color: var(--err);
-  font-family: var(--mono);
-  font-weight: 600;
+  color: var(--danger);
+  font-weight: 500;
 }
 
 /* Chips: each branch is a lane leaving the trunk next to its chip. */
@@ -178,7 +160,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-1);
-  margin: var(--space-2) 0 0;
+  margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
   user-select: none;
@@ -196,14 +178,9 @@
   left: calc(var(--axis) - var(--gutter) - var(--trunk-w) / 2);
   width: calc(var(--gutter) - var(--axis) - 2px);
   height: var(--stub-h);
-  border-bottom: var(--trunk-w) solid var(--c);
-  border-left: var(--trunk-w) solid var(--c);
+  border-bottom: var(--trunk-w) var(--lane-style) var(--lane);
+  border-left: var(--trunk-w) var(--lane-style) var(--lane);
   border-bottom-left-radius: var(--stub-r);
-}
-
-.chip-row[data-status="discarded"]::before {
-  border-style: dashed;
-  opacity: 0.62;
 }
 
 .chip {
@@ -211,130 +188,78 @@
   align-items: center;
   gap: var(--space-2);
   max-width: 100%;
-  min-height: 28px;
-  padding: 0 var(--space-2) 0 var(--space-1);
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--c) 10%, transparent);
-  color: var(--text);
-  font-size: 13px;
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-tape);
+  background: var(--lane-tint);
+  color: var(--ink);
+  font-size: var(--text-m);
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
 }
 
 .chip:hover {
-  background: color-mix(in srgb, var(--c) 20%, transparent);
+  background: var(--lane-tint-strong);
 }
 
-.chip-num {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  background: var(--c);
-  color: var(--surface-2);
-  font: 700 11px/1 var(--mono);
+.chip-merged:hover,
+.chip-discarded:hover {
+  background: var(--wash);
 }
 
 .chip .fork {
-  color: var(--c);
+  color: var(--lane);
 }
 
 .chip-quote {
   min-width: 0;
   overflow: hidden;
+  font-family: var(--font-read);
   font-style: italic;
+  text-decoration: underline var(--lane-style) var(--lane) 2px;
+  text-underline-offset: 4px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chip-discarded {
-  opacity: 0.62;
+.chip-status {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
 }
 
 .chip-discarded .chip-quote {
-  text-decoration: line-through;
+  color: var(--ink-soft);
+  text-decoration: line-through var(--ink-soft) 1px;
 }
 
 /* Open in the side panel right now. */
 .chip-active,
 .chip-active:hover {
-  background: color-mix(in srgb, var(--c) 24%, transparent);
-  box-shadow: inset 0 0 0 1px var(--c);
+  background: var(--lane-tint-strong);
+  box-shadow: inset 3px 0 0 var(--lane);
 }
 
-/* A branch just opened: its chip pops in, its colour ring fades out. */
-.chip[data-fresh] {
-  animation:
-    chip-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1),
-    ring-out 0.9s ease-out;
+.chip-merged.chip-active,
+.chip-discarded.chip-active {
+  background: var(--wash);
 }
 
-@keyframes chip-pop {
-  from {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-}
-
-@keyframes ring-out {
-  from {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 85%, transparent);
-  }
-  to {
-    box-shadow: 0 0 0 12px transparent;
-  }
-}
-
-/* Merge node: a larger neon ring where lanes come back into the trunk. */
+/* Merge node: a larger ring where lanes come back into the trunk. */
 .turn-merge {
   --node: var(--node-merge);
-  --node-top: 14px;
+  --node-top: 10px;
 }
 
 .turn-merge::before {
-  border: 3px solid var(--neon);
-  background: var(--bg);
-}
-
-/* A merge just applied: the node pops in and a neon ring expands once. */
-.turn-merge:has(> .merge-node[data-fresh])::before {
-  animation: node-in 0.35s ease-out;
-}
-
-.turn-merge:has(> .merge-node[data-fresh])::after {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  top: calc(var(--node-top) - var(--node) / 2);
-  left: calc(var(--axis) - var(--gutter) - var(--node) / 2);
-  width: var(--node);
-  height: var(--node);
-  border: 2px solid var(--neon);
-  border-radius: 50%;
-  opacity: 0;
-  pointer-events: none;
-  animation: merge-ring 0.9s ease-out;
+  border: 3px solid var(--node-color);
+  background: var(--node-fill);
 }
 
 @keyframes node-in {
   from {
     transform: scale(0.3);
-    opacity: 0;
-  }
-}
-
-@keyframes merge-ring {
-  from {
-    transform: scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: scale(3.2);
     opacity: 0;
   }
 }
@@ -345,60 +270,15 @@
   gap: var(--space-3);
 }
 
-/* The horizontal dashed rule: "⤵ Merged N branches" and the merged branches' chips. */
-.merge-node-rule {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 28px;
-}
-
-.merge-node-rule::after {
-  content: "";
-  flex: 1;
-  min-width: 24px;
-  border-top: 1px dashed var(--border);
-}
-
 .merge-node-title {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: var(--text-s);
   font-weight: 500;
-}
-
-.merge-node-title::before {
-  content: "⤵ ";
-  color: var(--neon);
-}
-
-.merge-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 8px;
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--c) 10%, transparent);
-  color: var(--c);
-  font: 700 11px/16px var(--mono);
-}
-
-.swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--c);
-}
-
-.merge-chip[data-fresh] {
-  animation: chip-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.2s both;
+  line-height: 20px;
 }
 
 .merge-node-branch {
   position: relative;
-  border-radius: 6px;
 }
 
 /* The lane comes down beside the trunk and curves back into it. */
@@ -409,8 +289,8 @@
   left: calc(var(--axis) - var(--gutter) - var(--trunk-w) / 2);
   width: calc(var(--gutter) - var(--axis) - 6px);
   height: calc(var(--stub-h) + 6px);
-  border-right: var(--trunk-w) solid var(--c);
-  border-bottom: var(--trunk-w) solid var(--c);
+  border-right: var(--trunk-w) solid var(--lane);
+  border-bottom: var(--trunk-w) solid var(--lane);
   border-bottom-right-radius: var(--stub-r);
 }
 
@@ -421,22 +301,23 @@
   padding: 0;
   border: none;
   background: none;
-  color: var(--text);
+  color: var(--ink);
+  font-family: var(--font-read);
   font-size: var(--text-m);
   font-style: italic;
   text-align: left;
-  text-decoration: underline solid var(--c) 2px;
+  text-decoration: underline solid var(--lane) 2px;
   text-underline-offset: 4px;
   overflow-wrap: anywhere;
   cursor: pointer;
 }
 
 .quote-link:hover {
-  color: var(--c);
+  color: var(--lane-ink);
 }
 
 .merge-node-none {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .merge-node-points {
@@ -458,26 +339,26 @@
   display: none;
 }
 
-/* The bullet is the branch colour: these points came back from that branch. */
+/* The bullet is the lane colour: these points came back from that branch. */
 .merge-node-points summary::before {
   content: "";
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 2px;
-  background: var(--c);
+  border-radius: var(--radius-tape);
+  background: var(--lane);
   transform: translateY(-1px);
 }
 
 .merge-node-points summary:hover {
   text-decoration: underline;
-  text-decoration-color: var(--border);
+  text-decoration-color: var(--edge);
   text-underline-offset: 3px;
 }
 
 .merge-node-points details p {
   margin: 0 0 var(--space-2) calc(8px + var(--space-2));
-  color: var(--muted);
+  color: var(--ink-soft);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -487,14 +368,16 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
+  max-width: var(--measure);
   padding: var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
   background: var(--surface);
 }
 
 .composer:focus-within {
-  border-color: var(--neon);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 .composer textarea {
@@ -504,7 +387,7 @@
   padding: 5px var(--space-2);
   border: none;
   background: transparent;
-  line-height: var(--lh);
+  line-height: var(--lh-ui);
   resize: none;
 }
 
@@ -513,16 +396,17 @@
 }
 
 .composer textarea::placeholder {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .composer textarea:disabled {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .composer-hint {
+  max-width: var(--measure);
   margin-top: var(--space-2);
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: var(--text-s);
 }
 
@@ -532,10 +416,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
+  max-width: var(--measure);
   margin-bottom: var(--space-2);
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--neon);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink);
   border-radius: var(--radius-s);
   background: var(--surface);
   font-weight: 500;
@@ -555,9 +440,9 @@
   justify-content: center;
   gap: var(--space-2);
   border: none;
-  border-radius: var(--radius-pill);
-  background: var(--neon);
-  color: var(--bg);
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--on-ink);
   box-shadow: var(--shadow-float);
   font-size: var(--text-m);
   font-weight: 600;
@@ -566,7 +451,7 @@
 }
 
 .open-branch-btn:focus-visible {
-  outline-color: var(--text);
+  outline-color: var(--lane-0);
 }
 
 .open-branch-btn:disabled {
@@ -583,6 +468,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  max-width: calc(var(--measure) + var(--gutter));
 }
 
 .first-screen p {
@@ -591,10 +477,10 @@
   font-size: var(--text-xl);
   font-weight: 500;
   line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 .diagram {
-  --c: #ff6fae; /* the first branch colour */
   display: block;
   width: 260px;
   max-width: 100%;
@@ -611,54 +497,55 @@
 }
 
 .diagram .d-trunk {
-  stroke: var(--border);
+  stroke: var(--trunk);
   stroke-width: 2;
 }
 
 .diagram .d-lane {
-  stroke: var(--c);
+  stroke: var(--lane-0);
   stroke-width: 2.5;
 }
 
 .diagram .d-under {
-  stroke: var(--c);
+  stroke: var(--lane-0);
   stroke-width: 2;
 }
 
 .diagram .d-ring {
-  fill: var(--bg);
-  stroke: var(--neon);
+  fill: var(--ground);
+  stroke: var(--ink);
   stroke-width: 2;
 }
 
 .diagram .d-dot {
-  fill: var(--muted);
+  fill: var(--ink);
 }
 
 .diagram .d-merge {
-  fill: var(--bg);
-  stroke: var(--neon);
+  fill: var(--ground);
+  stroke: var(--ink);
   stroke-width: 3;
 }
 
 .diagram .d-user {
-  fill: var(--neon);
+  fill: var(--wash);
+  stroke: var(--rule);
 }
 
 .diagram .d-line {
-  fill: color-mix(in srgb, var(--text) 22%, transparent);
+  fill: var(--rule);
 }
 
 .diagram .d-tint {
-  fill: color-mix(in srgb, var(--c) 20%, transparent);
+  fill: var(--lane-0-tint);
 }
 
 .diagram .d-point {
-  fill: var(--c);
+  fill: var(--lane-0);
 }
 
 .diagram .d-soft {
-  fill: color-mix(in srgb, var(--text) 22%, transparent);
+  fill: var(--rule);
 }
 
 .diagram .d-draw {
@@ -692,26 +579,98 @@
   padding-top: var(--space-2);
 }
 
-@media (max-width: 720px) {
-  .user-text,
-  .msg-assistant > .md {
-    max-width: 100%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .diagram .d-draw,
   .diagram .d-fade,
-  .chip[data-fresh],
-  .merge-chip[data-fresh],
-  .turn-merge::before,
-  .turn-merge::after {
-    animation: none !important;
+  .turn-merge::before {
+    animation: none;
     stroke-dashoffset: 0;
     opacity: 1;
   }
+}
 
-  .turn-merge::after {
-    display: none;
+/* The main column adapts: wider reading measure when no branch panel is open, centred. */
+.chat-col {
+  margin-inline: auto;
+}
+
+.layout:not(.with-panel) .chat {
+  --measure: 46rem;
+}
+
+/* The user's turns sit on the right, like a normal chat. */
+.turn-user {
+  align-items: flex-end;
+}
+
+.turn-user .user-text {
+  max-width: min(85%, 32rem);
+  border-radius: 14px 14px 4px 14px;
+}
+
+/* A branch just opened: its chip pops in and a ring in its lane colour fades out. */
+.chip[data-fresh] {
+  animation:
+    chip-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1),
+    ring-out 0.9s ease-out;
+}
+
+@keyframes chip-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes ring-out {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--lane) 85%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+/* A merge just applied: the node pops in and a ring expands once from it. */
+.turn-merge:has(> .merge-node[data-fresh])::before {
+  animation: node-in 0.35s ease-out;
+}
+
+.turn-merge:has(> .merge-node[data-fresh])::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: calc(var(--node-top) - var(--node) / 2);
+  left: calc(var(--axis) - var(--gutter) - var(--node) / 2);
+  width: var(--node);
+  height: var(--node);
+  border: 2px solid var(--node-color);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: merge-ring 0.9s ease-out;
+}
+
+@keyframes merge-ring {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+.merge-node[data-fresh] .merge-node-branch {
+  animation: chip-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip[data-fresh],
+  .merge-node[data-fresh] .merge-node-branch,
+  .turn-merge:has(> .merge-node[data-fresh])::before,
+  .turn-merge:has(> .merge-node[data-fresh])::after {
+    animation: none;
   }
 }

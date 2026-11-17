@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, toApiError } from "../api";
-import { branchColors } from "../lanes";
+import { laneOf } from "../lanes";
 import type { MergeFocus } from "../hooks/useGraft";
 import type { Branch, ConversationState } from "../types";
 import { MergeBranchCard, type Decision, type TakeawayStatus } from "./MergeBranchCard";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { Modal } from "./Modal";
 
 interface Props {
@@ -39,7 +40,6 @@ export function MergeDialog({
   onModelCall,
 }: Props) {
   const open = state.branches.filter((b) => b.status === "open");
-  const colors = branchColors(state.branches);
   const [decisions, setDecisions] = useState(() => initialDecisions(open, focus));
   const [takeaways, setTakeaways] = useState<Record<number, TakeawayStatus>>({});
   const [busyPoints, setBusyPoints] = useState<ReadonlySet<number>>(new Set());
@@ -99,12 +99,8 @@ export function MergeDialog({
     setTakeaways((t) => ({ ...t, [branchId]: { loading: false, error: null } }));
   };
 
-  const regenerate = (branchId: number): void => {
-    const ok = window.confirm(
-      "Regenerate this take-away? The current points and your edits to them will be replaced.",
-    );
-    if (ok) void generate(branchId, true);
-  };
+  const [confirmRegen, setConfirmRegen] = useState<number | null>(null);
+  const regenerate = (branchId: number): void => setConfirmRegen(branchId);
 
   const mergeIds = open.filter((b) => decisionOf(b) === "merge").map((b) => b.id);
   const discardIds = open.filter((b) => decisionOf(b) === "discard").map((b) => b.id);
@@ -173,7 +169,7 @@ export function MergeDialog({
         <MergeBranchCard
           key={b.id}
           branch={b}
-          color={colors.get(b.id)}
+          lane={laneOf(state.branches, b.id)}
           decision={decisionOf(b)}
           takeaway={takeaways[b.id] ?? null}
           anyGenerating={generating}
@@ -186,6 +182,19 @@ export function MergeDialog({
           onPointBusy={onPointBusy}
         />
       ))}
+      {confirmRegen !== null && (
+        <ConfirmDialog
+          title="Regenerate the take-away?"
+          message="The current points and your edits to them will be replaced."
+          confirmLabel="Regenerate"
+          onCancel={() => setConfirmRegen(null)}
+          onConfirm={() => {
+            const id = confirmRegen;
+            setConfirmRegen(null);
+            void generate(id, true);
+          }}
+        />
+      )}
     </Modal>
   );
 }

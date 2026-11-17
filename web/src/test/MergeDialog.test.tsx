@@ -280,18 +280,19 @@ describe("MergeDialog", () => {
   });
 
   it("regenerates only after a confirmation", async () => {
-    const confirm = vi.fn(() => false);
-    vi.stubGlobal("confirm", confirm);
     render(<Harness focus={[1]} onApplied={() => undefined} />);
     const alpha = card("alpha");
     await within(alpha).findByText("Point A of 1");
 
     fireEvent.click(within(alpha).getByRole("button", { name: "Regenerate" }));
-    expect(confirm).toHaveBeenCalledTimes(1);
+    const ask = screen.getByRole("dialog", { name: "Regenerate the take-away?" });
+    fireEvent.click(within(ask).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Regenerate the take-away?" })).toBeNull();
     expect(server.callsTo("/takeaway").length).toBe(1);
 
-    confirm.mockReturnValue(true);
     fireEvent.click(within(alpha).getByRole("button", { name: "Regenerate" }));
+    const again = screen.getByRole("dialog", { name: "Regenerate the take-away?" });
+    fireEvent.click(within(again).getByRole("button", { name: "Regenerate" }));
     await waitFor(() => expect(server.callsTo("/takeaway").length).toBe(2));
     expect(server.callsTo("/takeaway")[1].body).toEqual({ regenerate: true });
     await within(alpha).findByText("Point A of 1");

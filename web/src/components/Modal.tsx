@@ -23,6 +23,8 @@ export function Modal({ title, onClose, children, footer, wide = false }: Props)
     ref.current?.focus();
 
     const onKeyDown = (e: KeyboardEvent): void => {
+      const dialogs = document.querySelectorAll(".modal");
+      if (dialogs[dialogs.length - 1] !== ref.current) return; // a dialog above this one handles it
       if (e.key === "Escape") {
         e.preventDefault();
         onCloseRef.current();
