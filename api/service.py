@@ -297,6 +297,7 @@ class Service:
             "main": [_message_json(m, attachments) for m in tree.thread(messages)],
             "branches": [_branch_json(b, messages, points, attachments) for b in branches],
             "pending_branch_ids": pending,
+            "usage": db.usage(conn, conversation_id),
         }
 
     def _check(self, conn: sqlite3.Connection, conversation_id: int) -> None:
@@ -358,15 +359,17 @@ class Service:
         conversation_id: int,
         branch_id: int | None,
         purpose: CallPurpose,
-    ) -> Completion:
-        """Call the model and log the call (DESIGN.md §4: every LLM call is logged)."""
+    ) -> tuple[Completion, int]:
+        """Call the model and log the call (DESIGN.md §4: every LLM call is logged).
+
+        Returns the completion and the id of its row in ``llm_call_log``."""
         try:
             completion = provider.complete(model, prompt, tag=purpose.value)
         except ProviderError as error:
             code = _PROVIDER_CODES.get(error.kind, "provider_error")
             raise ApiError(502, code, error.message) from error
         with db.transaction(conn):
-            db.insert_log(
+            log_id = db.insert_log(
                 conn,
                 conversation_id=conversation_id,
                 branch_id=branch_id,
@@ -382,7 +385,7 @@ class Service:
                 response_text=completion.text,
                 now=self._now(),
             )
-        return completion
+        return completion, log_id
 
     def _build_context(
         self,
@@ -447,7 +450,7 @@ class Service:
         prompt: Sequence[ChatMessage],
     ) -> dict:
         """Call the model for a thread that ends with a user message and store the answer."""
-        completion = self._call(
+        completion, call_id = self._call(
             conn,
             provider,
             model,
@@ -460,7 +463,7 @@ class Service:
             thread = tree.thread(db.load_messages(conn, conversation_id), branch_id)
             if not thread or thread[-1].role != Role.USER:
                 raise conflict("The thread changed while the model was answering; the answer was dropped.")
-            db.insert_message(
+            answer = db.insert_message(
                 conn,
                 conversation_id=conversation_id,
                 branch_id=branch_id,
@@ -469,6 +472,7 @@ class Service:
                 content=completion.text,
                 now=self._now(),
             )
+            db.link_call(conn, call_id, answer.id)
             self._check(conn, conversation_id)
         return self._state(conn, conversation_id)
 
@@ -675,14 +679,14 @@ class Service:
                     for message_id, found in db.load_attachments(conn, conversation_id).items()
                 }
                 prompt = takeaway.build_prompt(branch.anchor_quote, thread, files)
-                answer = self._call(conn, provider, model, prompt, **call).text
+                answer = self._call(conn, provider, model, prompt, **call)[0].text
                 try:
                     generated = takeaway.parse(answer)
                 except takeaway.TakeawayParseError:
                     # One more attempt, showing the model its unreadable answer.
                     answer = self._call(
                         conn, provider, model, takeaway.retry_prompt(prompt, answer), **call
-                    ).text
+                    )[0].text
                     try:
                         generated = takeaway.parse(answer)
                     except takeaway.TakeawayParseError as error:

@@ -541,6 +541,62 @@ def list_logs(conn: sqlite3.Connection, conversation_id: int | None = None) -> l
     return [_log(row) for row in rows]
 
 
+def link_call(conn: sqlite3.Connection, call_id: int, message_id: int) -> None:
+    """Remember that the call ``call_id`` produced the answer ``message_id``."""
+    conn.execute("INSERT INTO call_message (call_id, message_id) VALUES (?, ?)", (call_id, message_id))
+
+
+def _totals() -> dict:
+    return {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+
+
+def _add(totals: dict, row: sqlite3.Row) -> None:
+    totals["calls"] += 1
+    totals["input_tokens"] += row["input_tokens"]
+    totals["output_tokens"] += row["output_tokens"]
+    totals["cost"] += row["cost_estimate"]
+
+
+def usage(conn: sqlite3.Connection, conversation_id: int) -> dict:
+    """Tokens and cost of a conversation's model calls, from ``llm_call_log``.
+
+    ``total``, ``chat`` and ``takeaway`` add up every call; ``threads`` splits them by
+    thread (``branch_id`` None = main; a take-away counts for its branch); ``messages``
+    gives, for each answer, the call that produced it: ``input_tokens`` is the size of the
+    whole context the model received for that answer.
+    """
+    rows = conn.execute(
+        """
+        SELECT l.branch_id, l.purpose, l.model, l.input_tokens, l.output_tokens,
+               l.cost_estimate, cm.message_id
+        FROM llm_call_log l LEFT JOIN call_message cm ON cm.call_id = l.id
+        WHERE l.conversation_id = ?
+        ORDER BY l.id
+        """,
+        (conversation_id,),
+    ).fetchall()
+    result = {"total": _totals(), "chat": _totals(), "takeaway": _totals(), "threads": [], "messages": []}
+    threads: dict[int | None, dict] = {}
+    for row in rows:
+        _add(result["total"], row)
+        if row["purpose"] in ("chat", "takeaway"):
+            _add(result[row["purpose"]], row)
+        thread = threads.setdefault(row["branch_id"], {"branch_id": row["branch_id"], **_totals()})
+        _add(thread, row)
+        if row["message_id"] is not None:
+            result["messages"].append(
+                {
+                    "message_id": row["message_id"],
+                    "model": row["model"],
+                    "input_tokens": row["input_tokens"],
+                    "output_tokens": row["output_tokens"],
+                    "cost": row["cost_estimate"],
+                }
+            )
+    result["threads"] = list(threads.values())
+    return result
+
+
 def month_spend(conn: sqlite3.Connection, now: datetime) -> float:
     """Sum of ``cost_estimate`` over the calendar month of ``now`` (same timezone as stored)."""
     start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
