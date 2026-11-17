@@ -1,5 +1,6 @@
 import { plainQuote } from "../lanes";
 import type { Branch, ConversationState } from "../types";
+import { AddPoint } from "./AddPoint";
 import { PointRow } from "./PointRow";
 
 export type Decision = "merge" | "later" | "discard";
@@ -156,6 +157,9 @@ export function MergeBranchCard({
                 ))}
               </ul>
             </>
+          )}
+          {!loading && !empty && (takeaway !== null || branch.points.length > 0) && (
+            <AddPoint branchId={branch.id} disabled={locked} onState={onState} onError={onError} />
           )}
         </div>
       )}

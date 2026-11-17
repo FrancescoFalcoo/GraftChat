@@ -126,6 +126,9 @@ export const api = {
     ),
   patchPoint: (pointId: number, update: PointUpdate) =>
     request<ConversationState>("PATCH", `/api/points/${pointId}`, update),
+  addPoint: (branchId: number, text: string, title?: string) =>
+    request<ConversationState>("POST", `/api/branches/${branchId}/points`, title ? { text, title } : { text }),
+  deletePoint: (pointId: number) => request<ConversationState>("DELETE", `/api/points/${pointId}`),
   merge: (conversationId: number, branchIds: number[]) =>
     request<ConversationState>("POST", `/api/conversations/${conversationId}/merge`, {
       branch_ids: branchIds,

@@ -38,6 +38,8 @@ export interface Point {
   text_generated: string;
   text_final: string;
   included: boolean;
+  /** "user" for a point added by hand (its text_generated is ""). */
+  origin: "model" | "user";
 }
 
 export interface Branch {
@@ -114,4 +116,5 @@ export interface OpenBranchResponse {
 export interface PointUpdate {
   included?: boolean;
   text_final?: string;
+  title?: string;
 }

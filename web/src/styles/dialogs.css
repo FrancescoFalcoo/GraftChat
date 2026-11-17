@@ -386,6 +386,56 @@
   box-shadow: 0 0 0 1px var(--ink);
 }
 
+.point-title-input {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-2);
+  padding: 4px var(--space-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  font-weight: 500;
+}
+
+.link-danger {
+  color: var(--danger);
+}
+
+.add-point-open {
+  margin-top: var(--space-2);
+}
+
+.add-point {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--edge);
+  border-radius: var(--radius-s);
+  font-size: var(--text-s);
+}
+
+.add-point textarea,
+.add-point input {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  font-size: var(--text-m);
+  line-height: var(--lh-ui);
+}
+
+.add-point textarea {
+  resize: vertical;
+}
+
+.add-point-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
 .point-meta {
   display: flex;
   flex-wrap: wrap;

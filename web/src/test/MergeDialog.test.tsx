@@ -36,6 +36,7 @@ function point(id: number, branchId: number, position: number, title: string, te
     text_generated: text,
     text_final: text,
     included: true,
+    origin: "model",
   };
 }
 
@@ -108,6 +109,25 @@ function fakeServer() {
             const p = b.points.find((x) => x.id === id);
             if (p) Object.assign(p, body);
           }
+        }),
+      );
+    }
+    if ((m = /^\/api\/branches\/(\d+)\/points$/.exec(input)) && method === "POST") {
+      const id = Number(m[1]);
+      const { text, title } = body as { text: string; title?: string };
+      return ok(
+        mutate((s) => {
+          const b = s.branches.find((x) => x.id === id)!;
+          const added = point(nextPointId++, id, b.points.length, title ?? text.split(" ").slice(0, 5).join(" "), text);
+          b.points.push({ ...added, text_generated: "", origin: "user" });
+        }),
+      );
+    }
+    if ((m = /^\/api\/points\/(\d+)$/.exec(input)) && method === "DELETE") {
+      const id = Number(m[1]);
+      return ok(
+        mutate((s) => {
+          for (const b of s.branches) b.points = b.points.filter((x) => x.id !== id);
         }),
       );
     }
@@ -235,12 +255,33 @@ describe("MergeDialog", () => {
     expect(within(card("alpha")).getByText(/1 of 2 points/)).toBeTruthy();
   });
 
+  it("adds a point written by hand, then deletes it", async () => {
+    render(<Harness focus={[1]} onApplied={() => undefined} />);
+    const alpha = card("alpha");
+    await within(alpha).findByText("Point B of 1");
+    fireEvent.click(within(alpha).getByRole("button", { name: "+ Add a point" }));
+    fireEvent.change(within(alpha).getByLabelText("Text that enters the main context"), {
+      target: { value: "Use AVIF for photos" },
+    });
+    fireEvent.click(within(alpha).getByRole("button", { name: "Add point" }));
+
+    await within(alpha).findByText("Added by you");
+    expect(server.callsTo("/api/branches/1/points")).toEqual([
+      { method: "POST", url: "/api/branches/1/points", body: { text: "Use AVIF for photos" } },
+    ]);
+    expect(within(alpha).getByText(/3 of 3 points/)).toBeTruthy();
+
+    fireEvent.click(within(alpha).getByRole("button", { name: /Show the text of “Use AVIF for photos”/ }));
+    fireEvent.click(within(alpha).getByRole("button", { name: "Delete point" }));
+    await waitFor(() => expect(within(alpha).queryByText("Added by you")).toBeNull());
+  });
+
   it("saves an edited text on blur and offers to reset it", async () => {
     render(<Harness focus={[1]} onApplied={() => undefined} />);
     const alpha = card("alpha");
     await within(alpha).findByText("Point B of 1");
     fireEvent.click(within(alpha).getByRole("button", { name: /Show the text of “Point B of 1”/ }));
-    const area = within(alpha).getByRole("textbox") as HTMLTextAreaElement;
+    const area = within(alpha).getByRole("textbox", { name: /that enters the context/ }) as HTMLTextAreaElement;
     expect(area.value).toBe("Text B of branch 1");
 
     fireEvent.change(area, { target: { value: "My own wording" } });
@@ -258,7 +299,7 @@ describe("MergeDialog", () => {
     fireEvent.click(within(alpha).getByRole("button", { name: "Reset to generated" }));
     await waitFor(() => expect(within(alpha).queryByText("Edited")).toBeNull());
     expect(server.callsTo("/api/points/")[1].body).toEqual({ text_final: "Text B of branch 1" });
-    expect((within(alpha).getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+    expect((within(alpha).getByRole("textbox", { name: /that enters the context/ }) as HTMLTextAreaElement).value).toBe(
       "Text B of branch 1",
     );
   });

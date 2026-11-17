@@ -12,7 +12,7 @@ function message(id: number, role: Message["role"]): Message {
 }
 
 function point(branchId: number, included: boolean): Point {
-  return { id: branchId * 10, branch_id: branchId, position: 0, title: "t", text_generated: "x", text_final: "x", included };
+  return { id: branchId * 10, branch_id: branchId, position: 0, title: "t", text_generated: "x", text_final: "x", included, origin: "model" };
 }
 
 function branch(id: number, extra: Partial<Branch> = {}): Branch {

@@ -65,7 +65,29 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
     return () => window.clearTimeout(timer);
   }, [draft, dirty, saving]);
 
-  const edited = point.text_final !== point.text_generated;
+  const byUser = point.origin === "user";
+  const edited = !byUser && point.text_final !== point.text_generated;
+  const [titleDraft, setTitleDraft] = useState(point.title);
+  useEffect(() => setTitleDraft(point.title), [point.title]);
+
+  const saveTitle = (): void => {
+    const next = titleDraft.trim();
+    if (!next || next === point.title) {
+      setTitleDraft(point.title);
+      return;
+    }
+    void patch({ title: next });
+  };
+
+  const remove = async (): Promise<void> => {
+    setSaving(true);
+    try {
+      onState(await api.deletePoint(point.id));
+    } catch (e) {
+      onError(e);
+      setSaving(false);
+    }
+  };
 
   return (
     <li className={`point${point.included ? "" : " point-excluded"}`}>
@@ -80,6 +102,7 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
           <span className="point-title">{point.title}</span>
         </label>
         {edited && <span className="point-edited">Edited</span>}
+        {byUser && <span className="point-edited">Added by you</span>}
         <button
           type="button"
           className="icon-btn chevron"
@@ -95,6 +118,21 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
       </div>
       {expanded && (
         <div className="point-body" id={textId}>
+          <input
+            type="text"
+            className="point-title-input"
+            aria-label={`Title of “${point.title}”`}
+            value={titleDraft}
+            disabled={disabled || saving}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+          />
           <textarea
             aria-label={`Text of “${point.title}” that enters the context`}
             value={draft}
@@ -115,6 +153,16 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
                 onClick={() => void patch({ text_final: point.text_generated })}
               >
                 Reset to generated
+              </button>
+            )}
+            {byUser && (
+              <button
+                type="button"
+                className="link-btn link-danger"
+                disabled={disabled || saving}
+                onClick={() => void remove()}
+              >
+                Delete point
               </button>
             )}
           </div>
