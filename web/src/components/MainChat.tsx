@@ -20,7 +20,7 @@ interface Props {
   activeBranchId: number | null;
   /** Rendered above the composer (return-to-main banner). */
   banner: ReactNode;
-  onSend: (text: string, images: File[]) => Promise<boolean>;
+  onSend: (text: string, files: File[]) => Promise<boolean>;
   onRetry: () => void;
   onDelete: (messageId: number) => void;
   onOpenBranch: (messageId: number, selection: AnchorSelection) => Promise<boolean>;

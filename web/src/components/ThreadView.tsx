@@ -3,6 +3,8 @@ import { attachmentUrl } from "../api";
 import { useFreshIds } from "../hooks/useFreshIds";
 import type { PendingRequest } from "../hooks/useGraft";
 import type { Attachment, Message } from "../types";
+import { formatSize } from "../files";
+import { DocIcon } from "./Composer";
 import { MessageContent } from "./MessageContent";
 
 interface Props {
@@ -36,8 +38,47 @@ function Images({ items }: { items: { key: string; src: string; name: string }[]
   );
 }
 
-function stored(attachments: Attachment[] | undefined) {
-  return (attachments ?? []).map((a) => ({ key: `a${a.id}`, src: attachmentUrl(a.id), name: a.name }));
+function Documents({ items }: { items: { key: string; href: string | null; name: string; note: string }[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="msg-docs">
+      {items.map((d) => {
+        const body = (
+          <>
+            <DocIcon />
+            <span className="attach-doc-name">{d.name}</span>
+            {d.note && <span className="attach-doc-size">{d.note}</span>}
+          </>
+        );
+        return d.href ? (
+          <a key={d.key} className="attach-doc" href={d.href} download={d.name} title={`Download ${d.name}`}>
+            {body}
+          </a>
+        ) : (
+          <span key={d.key} className="attach-doc">
+            {body}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function storedImages(attachments: Attachment[] | undefined) {
+  return (attachments ?? [])
+    .filter((a) => a.kind === "image")
+    .map((a) => ({ key: `a${a.id}`, src: attachmentUrl(a.id), name: a.name }));
+}
+
+function storedDocuments(attachments: Attachment[] | undefined) {
+  return (attachments ?? [])
+    .filter((a) => a.kind === "document")
+    .map((a) => ({
+      key: `a${a.id}`,
+      href: attachmentUrl(a.id),
+      name: a.name,
+      note: a.chars === null ? formatSize(a.size) : `${a.chars.toLocaleString()} characters`,
+    }));
 }
 
 /** True when the thread ends with a user message nobody answered. */
@@ -81,7 +122,8 @@ export function ThreadView({
         if (m.role === "user") {
           return (
             <div key={m.id} className="turn turn-user msg msg-user" data-turn-id={m.id}>
-              <Images items={stored(m.attachments)} />
+              <Images items={storedImages(m.attachments)} />
+              <Documents items={storedDocuments(m.attachments)} />
               {m.content !== "" && <div className="user-text">{m.content}</div>}
               {dangling && last?.id === m.id && (
                 <div className="dangling" role="group" aria-label="No reply was received">
@@ -113,6 +155,9 @@ export function ThreadView({
         <div className="turn turn-user msg msg-user msg-optimistic">
           <Images
             items={(pending.images ?? []).map((src, i) => ({ key: `p${i}`, src, name: "image" }))}
+          />
+          <Documents
+            items={(pending.documents ?? []).map((name, i) => ({ key: `d${i}`, href: null, name, note: "" }))}
           />
           {pending.text !== "" && <div className="user-text">{pending.text}</div>}
         </div>

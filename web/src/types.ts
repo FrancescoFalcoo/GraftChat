@@ -5,10 +5,12 @@ export type BranchStatus = "open" | "merged" | "discarded";
 
 export interface Attachment {
   id: number;
-  kind: "image";
+  kind: "image" | "document";
   mime: string;
   name: string;
   size: number;
+  /** Characters of text the model receives (documents only). */
+  chars: number | null;
 }
 
 export interface Message {
@@ -21,8 +23,8 @@ export interface Message {
   attachments: Attachment[];
 }
 
-/** An image sent with a new message: base64 without the "data:" prefix. */
-export interface ImageUpload {
+/** A file sent with a new message: base64 without the "data:" prefix. */
+export interface FileUpload {
   name: string;
   mime: string;
   data: string;

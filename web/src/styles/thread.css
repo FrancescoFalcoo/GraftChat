@@ -429,6 +429,51 @@
   cursor: pointer;
 }
 
+.attach-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: 4px var(--space-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-s);
+  text-decoration: none;
+}
+
+a.attach-doc:hover {
+  background: var(--wash);
+}
+
+.attach-doc-name {
+  overflow: hidden;
+  max-width: 22ch;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.attach-doc-size {
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.attach-remove-inline {
+  position: static;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+}
+
+.msg-docs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: var(--measure);
+}
+
 .attach-problem {
   margin: 0;
   color: var(--danger);

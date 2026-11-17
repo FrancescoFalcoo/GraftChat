@@ -2,7 +2,7 @@ import type {
   ConversationState,
   ConversationSummary,
   Health,
-  ImageUpload,
+  FileUpload,
   Model,
   OpenBranchRequest,
   OpenBranchResponse,
@@ -100,12 +100,12 @@ export const api = {
     conversationId: number,
     content: string,
     branchId: number | null,
-    images: ImageUpload[] = [],
+    files: FileUpload[] = [],
   ) =>
     request<ConversationState>("POST", `/api/conversations/${conversationId}/messages`, {
       content,
       branch_id: branchId,
-      ...(images.length > 0 ? { images } : {}),
+      ...(files.length > 0 ? { files } : {}),
     }),
   generate: (conversationId: number, branchId: number | null) =>
     request<ConversationState>("POST", `/api/conversations/${conversationId}/generate`, {

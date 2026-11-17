@@ -5,7 +5,7 @@ import type {
   ConversationState,
   ConversationSummary,
   Health,
-  ImageUpload,
+  FileUpload,
   Settings,
 } from "../types";
 import {
@@ -15,7 +15,7 @@ import {
   threadKey,
   threadMessages,
 } from "../util";
-import { toUpload } from "../images";
+import { fileKind, toUpload } from "../files";
 import { playGlop } from "../sound";
 import { useToasts } from "./useToasts";
 
@@ -24,6 +24,8 @@ export interface PendingRequest {
   text: string | null;
   /** Object URLs of the images sent with it, shown until the server state arrives. */
   images?: string[];
+  /** Names of the documents sent with it. */
+  documents?: string[];
 }
 
 /** Which branches the merge dialog pre-selects for merging. */
@@ -196,17 +198,18 @@ export function useGraft() {
         }
       }
       const key = threadKey(conversationId, branchId);
-      const previews = files.map((f) => URL.createObjectURL(f));
-      setThreadPending(key, { text, images: previews });
+      const previews = files.filter((f) => fileKind(f) === "image").map((f) => URL.createObjectURL(f));
+      const documents = files.filter((f) => fileKind(f) === "document").map((f) => f.name);
+      setThreadPending(key, { text, images: previews, documents });
       try {
-        let images: ImageUpload[] = [];
+        let uploads: FileUpload[] = [];
         try {
-          images = await Promise.all(files.map(toUpload));
+          uploads = await Promise.all(files.map(toUpload));
         } catch (e) {
           pushError(e);
           return false; // nothing was sent
         }
-        applyState(await api.sendMessage(conversationId, text, branchId, images));
+        applyState(await api.sendMessage(conversationId, text, branchId, uploads));
         return true;
       } catch (e) {
         const err = toApiError(e);

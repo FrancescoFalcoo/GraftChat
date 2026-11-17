@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "../components/Composer";
-import { imageProblem, MAX_IMAGE_BYTES, MAX_IMAGES } from "../images";
+import { fileKind, fileProblem, MAX_FILES, MAX_IMAGE_BYTES, MAX_IMAGES } from "../files";
 import type { Branch, ConversationState, Message, Point } from "../types";
 import { knownMerges } from "../util";
 
@@ -64,18 +64,25 @@ describe("knownMerges", () => {
   });
 });
 
-describe("imageProblem", () => {
-  const file = (type: string, size = 10) => new File([new Uint8Array(size)], "f", { type });
+describe("fileProblem", () => {
+  const file = (type: string, size = 10, name = "f") => new File([new Uint8Array(size)], name, { type });
+  const none = { images: 0, total: 0 };
 
-  it("accepts the supported types", () => {
-    expect(imageProblem(file("image/png"), 0)).toBeNull();
-    expect(imageProblem(file("image/webp"), MAX_IMAGES - 1)).toBeNull();
+  it("accepts images, PDF, Word and text files", () => {
+    expect(fileProblem(file("image/png"), none)).toBeNull();
+    expect(fileProblem(file("image/webp"), { images: MAX_IMAGES - 1, total: MAX_IMAGES - 1 })).toBeNull();
+    expect(fileKind(file("application/pdf", 10, "a.pdf"))).toBe("document");
+    expect(fileKind(file("", 10, "report.docx"))).toBe("document");
+    expect(fileKind(file("", 10, "main.py"))).toBe("document");
+    expect(fileKind(file("", 10, "Dockerfile"))).toBe("document");
   });
 
-  it("refuses other types, large files and too many images", () => {
-    expect(imageProblem(file("image/svg+xml"), 0)).toMatch(/only PNG/);
-    expect(imageProblem(file("image/png", MAX_IMAGE_BYTES + 1), 0)).toMatch(/5 MB/);
-    expect(imageProblem(file("image/png"), MAX_IMAGES)).toMatch(/At most/);
+  it("refuses other types, large files and too many files", () => {
+    expect(fileProblem(file("image/svg+xml", 10, "a.svg"), none)).toMatch(/images, PDF/);
+    expect(fileProblem(file("application/zip", 10, "a.zip"), none)).toMatch(/images, PDF/);
+    expect(fileProblem(file("image/png", MAX_IMAGE_BYTES + 1), none)).toMatch(/5 MB/);
+    expect(fileProblem(file("image/png"), { images: MAX_IMAGES, total: MAX_IMAGES })).toMatch(/images per/);
+    expect(fileProblem(file("", 10, "a.txt"), { images: 0, total: MAX_FILES })).toMatch(/files per/);
   });
 });
 
@@ -112,8 +119,10 @@ describe("Composer with images", () => {
     render(<Composer label="Message" placeholder="" disabled={false} onSend={vi.fn(async () => true)} />);
     const ok = new File([new Uint8Array(4)], "ok.png", { type: "image/png" });
     const bad = new File([new Uint8Array(4)], "bad.bmp", { type: "image/bmp" });
-    fireEvent.paste(screen.getByLabelText("Message"), { clipboardData: { files: [ok, bad] } });
+    const doc = new File(["notes"], "notes.md", { type: "text/markdown" });
+    fireEvent.paste(screen.getByLabelText("Message"), { clipboardData: { files: [ok, bad, doc] } });
     expect(screen.getByAltText("ok.png")).toBeTruthy();
+    expect(screen.getByText("notes.md")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toMatch(/bad\.bmp/);
   });
 });

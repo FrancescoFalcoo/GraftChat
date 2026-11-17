@@ -6,33 +6,37 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import { IMAGE_TYPES, imageFiles, imageProblem } from "../images";
+import { ACCEPT, fileKind, fileProblem, filesOf, formatSize, type FileKind } from "../files";
 
 interface Props {
   label: string;
   placeholder: string;
   disabled: boolean;
-  /** Resolves to false when the message was not stored: text and images are put back. */
-  onSend: (text: string, images: File[]) => Promise<boolean>;
+  /** Resolves to false when the message was not stored: text and files are put back. */
+  onSend: (text: string, files: File[]) => Promise<boolean>;
 }
 
 const MAX_HEIGHT = 200;
 
 interface Picked {
   file: File;
-  url: string; // object URL for the thumbnail
+  kind: FileKind;
+  url: string | null; // object URL of an image's thumbnail
+  key: string;
 }
+
+let nextKey = 0;
 
 export function Composer({ label, placeholder, disabled, onSend }: Props) {
   const [value, setValue] = useState("");
-  const [images, setImages] = useState<Picked[]>([]);
+  const [picked, setPicked] = useState<Picked[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const wasDisabled = useRef(disabled);
-  const imagesRef = useRef(images);
-  imagesRef.current = images;
+  const pickedRef = useRef(picked);
+  pickedRef.current = picked;
 
   useEffect(() => {
     const el = ref.current;
@@ -50,48 +54,59 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
   }, [disabled]);
 
   // Thumbnails still on screen when the composer goes away.
-  useEffect(() => () => imagesRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
+  useEffect(
+    () => () =>
+      pickedRef.current.forEach((p) => {
+        if (p.url) URL.revokeObjectURL(p.url);
+      }),
+    [],
+  );
 
   const addFiles = (files: File[]): void => {
     if (files.length === 0) return;
-    let next = imagesRef.current;
+    let next = pickedRef.current;
     let firstProblem: string | null = null;
     for (const file of files) {
-      const why = imageProblem(file, next.length);
-      if (why) {
+      const counts = { images: next.filter((p) => p.kind === "image").length, total: next.length };
+      const why = fileProblem(file, counts);
+      const kind = fileKind(file);
+      if (why || kind === null) {
         firstProblem ??= why;
         continue;
       }
-      next = [...next, { file, url: URL.createObjectURL(file) }];
+      const url = kind === "image" ? URL.createObjectURL(file) : null;
+      next = [...next, { file, kind, url, key: `f${nextKey++}` }];
     }
-    setImages(next);
+    setPicked(next);
     setProblem(firstProblem);
   };
 
-  const remove = (index: number): void => {
-    const gone = images[index];
-    if (gone) URL.revokeObjectURL(gone.url);
-    setImages(images.filter((_, i) => i !== index));
+  const remove = (key: string): void => {
+    const gone = picked.find((p) => p.key === key);
+    if (gone?.url) URL.revokeObjectURL(gone.url);
+    setPicked(picked.filter((p) => p.key !== key));
     setProblem(null);
   };
 
   const submit = async (): Promise<void> => {
     const text = value.trim();
-    if ((!text && images.length === 0) || disabled) return;
-    const sent = images;
+    if ((!text && picked.length === 0) || disabled) return;
+    const sent = picked;
     setValue("");
-    setImages([]);
+    setPicked([]);
     setProblem(null);
     const stored = await onSend(
       text,
       sent.map((p) => p.file),
     );
     if (stored) {
-      sent.forEach((p) => URL.revokeObjectURL(p.url));
+      sent.forEach((p) => {
+        if (p.url) URL.revokeObjectURL(p.url);
+      });
       return;
     }
     setValue((current) => (current === "" ? text : current));
-    setImages((current) => (current.length === 0 ? sent : current));
+    setPicked((current) => (current.length === 0 ? sent : current));
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -102,7 +117,7 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
   };
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>): void => {
-    const files = imageFiles(e.clipboardData.files);
+    const files = filesOf(e.clipboardData.files);
     if (files.length === 0) return; // plain text: the browser pastes it
     e.preventDefault();
     addFiles(files);
@@ -110,13 +125,13 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
 
   const onDrop = (e: DragEvent<HTMLFormElement>): void => {
     setDragging(false);
-    const files = imageFiles(e.dataTransfer.files);
+    const files = filesOf(e.dataTransfer.files);
     if (files.length === 0 || disabled) return;
     e.preventDefault();
     addFiles(files);
   };
 
-  const empty = value.trim() === "" && images.length === 0;
+  const empty = value.trim() === "" && picked.length === 0;
 
   return (
     <form
@@ -136,21 +151,37 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
       }}
       onDrop={onDrop}
     >
-      {(images.length > 0 || problem) && (
+      {(picked.length > 0 || problem) && (
         <div className="attach-tray">
-          {images.map((p, i) => (
-            <figure key={p.url} className="attach-thumb">
-              <img src={p.url} alt={p.file.name} />
-              <button
-                type="button"
-                className="attach-remove"
-                aria-label={`Remove ${p.file.name}`}
-                onClick={() => remove(i)}
-              >
-                ×
-              </button>
-            </figure>
-          ))}
+          {picked.map((p) =>
+            p.url ? (
+              <figure key={p.key} className="attach-thumb">
+                <img src={p.url} alt={p.file.name} />
+                <button
+                  type="button"
+                  className="attach-remove"
+                  aria-label={`Remove ${p.file.name}`}
+                  onClick={() => remove(p.key)}
+                >
+                  ×
+                </button>
+              </figure>
+            ) : (
+              <span key={p.key} className="attach-doc" title={p.file.name}>
+                <DocIcon />
+                <span className="attach-doc-name">{p.file.name}</span>
+                <span className="attach-doc-size">{formatSize(p.file.size)}</span>
+                <button
+                  type="button"
+                  className="attach-remove attach-remove-inline"
+                  aria-label={`Remove ${p.file.name}`}
+                  onClick={() => remove(p.key)}
+                >
+                  ×
+                </button>
+              </span>
+            ),
+          )}
           {problem && (
             <p className="attach-problem" role="alert">
               {problem}
@@ -161,8 +192,8 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
       <button
         type="button"
         className="btn btn-small composer-attach"
-        aria-label="Attach images"
-        title="Attach images (or paste / drop them here)"
+        aria-label="Attach files"
+        title="Attach images, PDF, Word or text files (or paste / drop them here)"
         disabled={disabled}
         onClick={() => fileRef.current?.click()}
       >
@@ -179,7 +210,7 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
       <input
         ref={fileRef}
         type="file"
-        accept={IMAGE_TYPES.join(",")}
+        accept={ACCEPT}
         multiple
         hidden
         onChange={(e) => {
@@ -202,5 +233,19 @@ export function Composer({ label, placeholder, disabled, onSend }: Props) {
         Send
       </button>
     </form>
+  );
+}
+
+export function DocIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="doc-icon">
+      <path
+        d="M4 1.5h5.2L12.5 4.8v9.7h-8.5zM9 1.5v3.5h3.5M6 8h4.5M6 10.5h4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
