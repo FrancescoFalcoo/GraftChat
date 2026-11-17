@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useAnchorHighlights } from "../hooks/useAnchorHighlights";
+import { laneOf } from "../lanes";
 import type { PendingRequest } from "../hooks/useGraft";
 import type { AnchorSelection } from "../selection";
 import type { Branch, ConversationState, Message } from "../types";
 import { AnchorChips } from "./AnchorChips";
 import { Composer } from "./Composer";
+import { GraftDiagram } from "./Marks";
 import { MergeNode } from "./MergeNode";
 import { SelectionPopover } from "./SelectionPopover";
 import { isAwaitingReply, ThreadView } from "./ThreadView";
@@ -54,6 +56,7 @@ export function MainChat({
 
   const byAnchor = useMemo(() => groupBy(branches, (b) => b.anchor_message_id), [branches]);
   const byMerge = useMemo(() => groupBy(branches, (b) => b.merge_message_id), [branches]);
+  const laneOfId = useCallback((id: number) => laneOf(branches, id), [branches]);
 
   const contentOf = useCallback(
     (messageId: number): string | null => {
@@ -80,12 +83,13 @@ export function MainChat({
       : "Message GraftChat";
 
   const renderMerge = (m: Message): ReactNode => (
-    <MergeNode branches={byMerge.get(m.id) ?? []} onOpenBranch={onShowBranch} />
+    <MergeNode branches={byMerge.get(m.id) ?? []} laneOf={laneOfId} onOpenBranch={onShowBranch} />
   );
   const renderBelow = (m: Message): ReactNode => (
     <AnchorChips
       branches={byAnchor.get(m.id) ?? []}
       activeBranchId={activeBranchId}
+      laneOf={laneOfId}
       onOpenBranch={onShowBranch}
     />
   );
@@ -107,15 +111,12 @@ export function MainChat({
             renderBelow={renderBelow}
             emptyHint={
               booting ? (
-                <p className="muted">Loading…</p>
+                <p className="muted loading">Loading…</p>
               ) : (
-                <>
-                  <h2>Start a conversation</h2>
-                  <p className="muted">
-                    Ask something. Then select a passage of an answer to open a branch on it, and
-                    merge back only the points you want to keep.
-                  </p>
-                </>
+                <div className="first-screen">
+                  <GraftDiagram />
+                  <p>Ask something, then select any part of the answer to branch from it.</p>
+                </div>
               )
             }
           />
@@ -131,7 +132,7 @@ export function MainChat({
             onSend={onSend}
           />
           <p className="composer-hint">
-            Enter to send, Shift+Enter for a new line. Select text in an answer to open a branch.
+            Enter to send, Shift+Enter for a new line. Select any part of an answer to branch from it.
           </p>
         </div>
       </div>

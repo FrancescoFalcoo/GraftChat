@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, toApiError } from "../api";
+import { laneOf } from "../lanes";
 import type { MergeFocus } from "../hooks/useGraft";
 import type { Branch, ConversationState } from "../types";
 import { MergeBranchCard, type Decision, type TakeawayStatus } from "./MergeBranchCard";
@@ -170,6 +171,7 @@ export function MergeDialog({
         <MergeBranchCard
           key={b.id}
           branch={b}
+          lane={laneOf(state.branches, b.id)}
           decision={decisionOf(b)}
           takeaway={takeaways[b.id] ?? null}
           anyGenerating={generating}

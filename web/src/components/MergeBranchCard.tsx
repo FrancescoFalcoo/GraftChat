@@ -1,3 +1,4 @@
+import { plainQuote } from "../lanes";
 import type { Branch, ConversationState } from "../types";
 import { PointRow } from "./PointRow";
 
@@ -10,6 +11,8 @@ export interface TakeawayStatus {
 
 interface Props {
   branch: Branch;
+  /** Lane colour of the branch (lanes.ts). */
+  lane?: number;
   decision: Decision;
   takeaway: TakeawayStatus | null;
   /** A take-away is being generated for some branch (they run one at a time). */
@@ -32,6 +35,7 @@ const CHOICES: { value: Decision; label: string }[] = [
 
 export function MergeBranchCard({
   branch,
+  lane = 0,
   decision,
   takeaway,
   anyGenerating,
@@ -49,8 +53,13 @@ export function MergeBranchCard({
   const included = branch.points.filter((p) => p.included).length;
 
   return (
-    <section className={`merge-card merge-card-${decision}`} aria-label={`Branch on: ${branch.anchor_quote}`}>
-      <blockquote className="merge-quote">{branch.anchor_quote}</blockquote>
+    <section
+      className={`merge-card merge-card-${decision}`}
+      aria-label={`Branch on: ${branch.anchor_quote}`}
+      data-lane={lane}
+      data-decision={decision}
+    >
+      <blockquote className="merge-quote">{plainQuote(branch.anchor_quote)}</blockquote>
       <div className="merge-card-row">
         <span className="muted">
           {empty ? "No messages" : `${count} message${count === 1 ? "" : "s"}`}

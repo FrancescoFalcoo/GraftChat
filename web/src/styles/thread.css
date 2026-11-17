@@ -1,0 +1,591 @@
+/*
+ * The main column and the trunk.
+ *
+ * A thread is a column of turns. The trunk is a thin line in the gutter left of the
+ * text; each turn puts a node on it (user = hollow ring, answer = filled dot, merge =
+ * larger ring). A branch leaves the trunk as a short curved stub next to its chip and
+ * comes back at a merge node. Everything is drawn with borders and pseudo-elements
+ * outside the message text, so it survives any message length and window size.
+ */
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chat-head {
+  padding: var(--space-3) var(--col-pad);
+  border-bottom: 1px solid var(--rule);
+}
+
+.chat-head h1 {
+  overflow: hidden;
+  font-size: var(--text-m);
+  font-weight: 600;
+  line-height: var(--hit);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Left aligned: the column starts at the sidebar and stops at the reading measure. */
+.chat-col {
+  width: 100%;
+  max-width: calc(var(--measure) + var(--gutter) + 2 * var(--col-pad));
+  padding: 0 var(--col-pad);
+}
+
+.chat-scroll .chat-col {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+.chat-foot {
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.chat-foot .chat-col {
+  padding-left: calc(var(--col-pad) + var(--gutter));
+}
+
+/* Trunk */
+.thread {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--turn-gap);
+  padding-left: var(--gutter);
+}
+
+.thread::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  left: calc(var(--axis) - var(--trunk-w) / 2);
+  width: var(--trunk-w);
+  background: var(--trunk);
+}
+
+.turn {
+  position: relative;
+  min-width: 0;
+  --node-top: 14px;
+}
+
+.turn::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--node-top) - var(--node) / 2);
+  left: calc(var(--axis) - var(--gutter) - var(--node) / 2);
+  width: var(--node);
+  height: var(--node);
+  border-radius: 50%;
+}
+
+/* The user's own turn: grotesk, on a wash band, hollow ring on the trunk. */
+.turn-user {
+  --node-top: 19px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.turn-user::before {
+  border: 2px solid var(--node-color);
+  background: var(--node-fill);
+}
+
+.user-text {
+  max-width: var(--measure);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-s);
+  background: var(--wash);
+  font-weight: 500;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.msg-optimistic .user-text {
+  opacity: 0.65;
+}
+
+/* The model's answer: Literata (markdown.css), filled dot on the trunk. */
+.turn-assistant {
+  --node-top: 13.6px;
+}
+
+.turn-assistant::before {
+  background: var(--node-color);
+}
+
+.turn-thinking {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 27px;
+  color: var(--ink-soft);
+}
+
+.turn-thinking::before {
+  border: 2px solid var(--trunk);
+  background: var(--node-fill);
+}
+
+.dangling {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-s);
+}
+
+.dangling-note {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+/* Chips: each branch is a lane leaving the trunk next to its chip. */
+.chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  user-select: none;
+}
+
+.chip-row {
+  position: relative;
+  max-width: 100%;
+}
+
+.chip-row::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - var(--stub-h));
+  left: calc(var(--axis) - var(--gutter) - var(--trunk-w) / 2);
+  width: calc(var(--gutter) - var(--axis) - 2px);
+  height: var(--stub-h);
+  border-bottom: var(--trunk-w) var(--lane-style) var(--lane);
+  border-left: var(--trunk-w) var(--lane-style) var(--lane);
+  border-bottom-left-radius: var(--stub-r);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-tape);
+  background: var(--lane-tint);
+  color: var(--ink);
+  font-size: var(--text-m);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--lane-tint-strong);
+}
+
+.chip-merged:hover,
+.chip-discarded:hover {
+  background: var(--wash);
+}
+
+.chip .fork {
+  color: var(--lane);
+}
+
+.chip-quote {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-read);
+  font-style: italic;
+  text-decoration: underline var(--lane-style) var(--lane) 2px;
+  text-underline-offset: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-status {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+.chip-discarded .chip-quote {
+  color: var(--ink-soft);
+  text-decoration: line-through var(--ink-soft) 1px;
+}
+
+/* Open in the side panel right now. */
+.chip-active,
+.chip-active:hover {
+  background: var(--lane-tint-strong);
+  box-shadow: inset 3px 0 0 var(--lane);
+}
+
+.chip-merged.chip-active,
+.chip-discarded.chip-active {
+  background: var(--wash);
+}
+
+/* Merge node: a larger ring where lanes come back into the trunk. */
+.turn-merge {
+  --node: var(--node-merge);
+  --node-top: 10px;
+}
+
+.turn-merge::before {
+  border: 3px solid var(--node-color);
+  background: var(--node-fill);
+  animation: node-in 0.28s ease-out;
+}
+
+@keyframes node-in {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+.merge-node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.merge-node-title {
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.merge-node-branch {
+  position: relative;
+}
+
+/* The lane comes down beside the trunk and curves back into it. */
+.merge-node-branch::before {
+  content: "";
+  position: absolute;
+  top: calc(16px - var(--stub-h) - 6px);
+  left: calc(var(--axis) - var(--gutter) - var(--trunk-w) / 2);
+  width: calc(var(--gutter) - var(--axis) - 6px);
+  height: calc(var(--stub-h) + 6px);
+  border-right: var(--trunk-w) solid var(--lane);
+  border-bottom: var(--trunk-w) solid var(--lane);
+  border-bottom-right-radius: var(--stub-r);
+}
+
+.quote-link {
+  display: block;
+  max-width: 100%;
+  min-height: var(--hit);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-read);
+  font-size: var(--text-m);
+  font-style: italic;
+  text-align: left;
+  text-decoration: underline solid var(--lane) 2px;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.quote-link:hover {
+  color: var(--lane-ink);
+}
+
+.merge-node-none {
+  color: var(--ink-soft);
+}
+
+.merge-node-points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.merge-node-points summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.merge-node-points summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The bullet is the lane colour: these points came back from that branch. */
+.merge-node-points summary::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-tape);
+  background: var(--lane);
+  transform: translateY(-1px);
+}
+
+.merge-node-points summary:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--edge);
+  text-underline-offset: 3px;
+}
+
+.merge-node-points details p {
+  margin: 0 0 var(--space-2) calc(8px + var(--space-2));
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Composer */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: var(--measure);
+  padding: var(--space-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+}
+
+.composer:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 200px;
+  padding: 5px var(--space-2);
+  border: none;
+  background: transparent;
+  line-height: var(--lh-ui);
+  resize: none;
+}
+
+.composer textarea:focus {
+  outline: none;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-soft);
+}
+
+.composer textarea:disabled {
+  color: var(--ink-soft);
+}
+
+.composer-hint {
+  max-width: var(--measure);
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+/* Return-to-main banner */
+.return-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  max-width: var(--measure);
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  font-weight: 500;
+}
+
+.return-banner span {
+  flex: 1;
+  min-width: 12em;
+}
+
+/* Floating "Open branch" button: one of the two things that truly float. */
+.open-branch-btn {
+  position: fixed;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: none;
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-float);
+  font-size: var(--text-m);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.open-branch-btn:focus-visible {
+  outline-color: var(--lane-0);
+}
+
+.open-branch-btn:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+
+/* First screen: the idea itself, drawn once. */
+.thread-empty {
+  padding-top: 10vh;
+}
+
+.first-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: calc(var(--measure) + var(--gutter));
+}
+
+.first-screen p {
+  max-width: 26em;
+  margin-left: var(--gutter);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.diagram {
+  display: block;
+  width: 260px;
+  max-width: 100%;
+  height: auto;
+  margin-left: calc(var(--axis) - 14px); /* its trunk sits where the real one will */
+  overflow: visible;
+}
+
+.diagram .d-trunk,
+.diagram .d-lane,
+.diagram .d-under {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.diagram .d-trunk {
+  stroke: var(--trunk);
+  stroke-width: 2;
+}
+
+.diagram .d-lane {
+  stroke: var(--lane-0);
+  stroke-width: 2.5;
+}
+
+.diagram .d-under {
+  stroke: var(--lane-0);
+  stroke-width: 2;
+}
+
+.diagram .d-ring {
+  fill: var(--ground);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.diagram .d-dot {
+  fill: var(--ink);
+}
+
+.diagram .d-merge {
+  fill: var(--ground);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.diagram .d-user {
+  fill: var(--wash);
+  stroke: var(--rule);
+}
+
+.diagram .d-line {
+  fill: var(--rule);
+}
+
+.diagram .d-tint {
+  fill: var(--lane-0-tint);
+}
+
+.diagram .d-point {
+  fill: var(--lane-0);
+}
+
+.diagram .d-soft {
+  fill: var(--rule);
+}
+
+.diagram .d-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.9s ease-in-out forwards;
+}
+
+.diagram .d-late {
+  animation-delay: 0.5s;
+}
+
+.diagram .d-fade {
+  opacity: 0;
+  animation: fade 0.4s ease-out 1.3s forwards;
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fade {
+  to {
+    opacity: 1;
+  }
+}
+
+.loading {
+  padding-top: var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagram .d-draw,
+  .diagram .d-fade,
+  .turn-merge::before {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}

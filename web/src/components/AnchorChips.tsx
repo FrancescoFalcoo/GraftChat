@@ -1,32 +1,46 @@
+import { plainQuote } from "../lanes";
 import type { Branch } from "../types";
 import { truncate } from "../util";
+import { ForkIcon } from "./Marks";
 
 interface Props {
   /** Branches anchored to one assistant message. */
   branches: Branch[];
   activeBranchId: number | null;
+  /** Lane colour of a branch (lanes.ts). */
+  laneOf: (branchId: number) => number;
   onOpenBranch: (branchId: number) => void;
 }
 
-/** Clickable list of the branches anchored to a message (highlights are not clickable). */
-export function AnchorChips({ branches, activeBranchId, onOpenBranch }: Props) {
+const STATUS_WORD: Record<Branch["status"], string> = {
+  open: "Open",
+  merged: "Merged",
+  discarded: "Discarded",
+};
+
+/**
+ * The branches anchored to a message, each a lane leaving the trunk (highlights are not
+ * clickable, these are).
+ */
+export function AnchorChips({ branches, activeBranchId, laneOf, onOpenBranch }: Props) {
   if (branches.length === 0) return null;
   return (
-    <div className="chips" aria-label="Branches on this answer">
+    <ul className="chips" aria-label="Branches on this answer">
       {branches.map((b) => (
-        <button
-          key={b.id}
-          type="button"
-          className={`chip chip-${b.status}${b.id === activeBranchId ? " chip-active" : ""}`}
-          aria-pressed={b.id === activeBranchId}
-          title={b.anchor_quote}
-          onClick={() => onOpenBranch(b.id)}
-        >
-          <span aria-hidden="true">⑂</span>
-          <span className="chip-quote">«{truncate(b.anchor_quote, 40)}»</span>
-          <span className="chip-status">{b.status}</span>
-        </button>
+        <li key={b.id} className="chip-row" data-lane={laneOf(b.id)} data-status={b.status}>
+          <button
+            type="button"
+            className={`chip chip-${b.status}${b.id === activeBranchId ? " chip-active" : ""}`}
+            aria-pressed={b.id === activeBranchId}
+            title={b.anchor_quote}
+            onClick={() => onOpenBranch(b.id)}
+          >
+            <ForkIcon />
+            <span className="chip-quote">«{truncate(plainQuote(b.anchor_quote), 48)}»</span>
+            <span className="chip-status">{STATUS_WORD[b.status]}</span>
+          </button>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

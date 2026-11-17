@@ -1,5 +1,6 @@
 import type { ConversationSummary, Settings } from "../types";
 import { formatUsd } from "../util";
+import { GraftMark } from "./Marks";
 
 interface Props {
   conversations: ConversationSummary[];
@@ -29,11 +30,11 @@ export function Sidebar({
       <div className="sidebar-top">
         <div className="brand">
           <span className="brand-name">
-            <span aria-hidden="true">⑂</span> GraftChat
+            <GraftMark /> GraftChat
           </span>
           {settings?.fake_llm && (
             <span className="tag-fake" title="The server answers with a fake model">
-              FAKE LLM
+              Fake model
             </span>
           )}
         </div>

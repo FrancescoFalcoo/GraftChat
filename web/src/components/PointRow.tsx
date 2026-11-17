@@ -79,7 +79,7 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
           />
           <span className="point-title">{point.title}</span>
         </label>
-        {edited && <span className="point-edited">edited</span>}
+        {edited && <span className="point-edited">Edited</span>}
         <button
           type="button"
           className="icon-btn chevron"
@@ -88,7 +88,9 @@ export function PointRow({ point, disabled, onState, onError, onBusy }: Props) {
           aria-label={`${expanded ? "Hide" : "Show"} the text of “${point.title}”`}
           onClick={() => setExpanded((v) => !v)}
         >
-          {expanded ? "▴" : "▾"}
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+            <path d="M4 6l4 4 4-4" />
+          </svg>
         </button>
       </div>
       {expanded && (

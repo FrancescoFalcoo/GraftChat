@@ -5,6 +5,7 @@ import { DevNotice, ReturnBanner, Toasts } from "./components/Notices";
 import { SettingsModal } from "./components/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
 import { useGraft } from "./hooks/useGraft";
+import { laneOf } from "./lanes";
 import { pendingBranches } from "./util";
 
 export function App() {
@@ -50,6 +51,7 @@ export function App() {
         {panelBranch && (
           <BranchPanel
             branch={panelBranch}
+            lane={laneOf(state?.branches ?? [], panelBranch.id)}
             pending={g.pendingFor(panelBranch.id)}
             onClose={g.closePanel}
             onSend={(text) => g.sendMessage(panelBranch.id, text)}

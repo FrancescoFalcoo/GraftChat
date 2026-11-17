@@ -87,7 +87,7 @@ describe("App", () => {
 
     const nav = screen.getByRole("navigation", { name: "Conversations" });
     expect(within(nav).getByRole("button", { name: /Demo chat/ }).getAttribute("aria-current")).toBe("page");
-    expect(within(nav).getByText("FAKE LLM")).toBeTruthy();
+    expect(within(nav).getByText("Fake model")).toBeTruthy();
     expect(within(nav).getByText("This month: $1.23 / $5.00")).toBeTruthy();
     expect(
       screen.getByText(
@@ -156,7 +156,8 @@ describe("App", () => {
     // The emoji before the selection counts as one code point, not two UTF-16 units.
     expect(Array.from(ANSWER).slice(sent.start, sent.end).join("")).toBe(sent.quote);
     expect(sent.start).toBe(ANSWER.indexOf("Second") - 1);
-    expect(within(panel).getByText("Second** point")).toBeTruthy();
+    // The quote is shown without its markdown markers.
+    expect(within(panel).getByText("Second point")).toBeTruthy();
     // Merge… is disabled on an empty branch; the banner hides while the panel is open.
     expect(within(panel).getByRole("button", { name: "Merge…" })).toHaveProperty("disabled", true);
     expect(screen.queryByText(/You came back from/)).toBeNull();

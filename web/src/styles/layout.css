@@ -1,3 +1,4 @@
+/* Flat surfaces separated by rules: sidebar | main column | side panel. */
 .app {
   display: flex;
   flex-direction: column;
@@ -8,34 +9,31 @@
 .layout {
   position: relative;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
 
 .layout.with-panel {
-  grid-template-columns: 260px minmax(0, 1fr) minmax(340px, 34vw);
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--panel-w);
 }
 
 /* Dev notice */
 .dev-notice {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 12px;
-  background: var(--warn-bg);
-  color: var(--warn-text);
-  font-size: 13px;
+  gap: var(--space-3);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  background: var(--wash);
+  font-size: var(--text-s);
 }
 
 .dev-notice span {
   flex: 1;
   min-width: 0;
+  padding: var(--space-1) 0;
   overflow-wrap: anywhere;
-}
-
-.dev-notice .icon-btn {
-  color: inherit;
 }
 
 /* Sidebar */
@@ -43,75 +41,93 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-soft);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--rule);
   user-select: none;
 }
 
-.sidebar-top,
-.sidebar-bottom {
-  padding: 14px;
+.sidebar-top {
+  padding: var(--space-4) var(--space-4) var(--space-3);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  min-height: var(--hit);
+  margin-bottom: var(--space-3);
 }
 
 .brand-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-l);
   font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
+}
+
+.mark {
+  flex: none;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.mark-trunk {
+  stroke: var(--ink);
+  stroke-width: 2.2;
+}
+
+.mark-lane {
+  stroke: var(--lane-0);
+  stroke-width: 2.2;
 }
 
 .tag-fake {
-  padding: 1px 6px;
-  border: 1px solid var(--warn-text);
-  border-radius: 4px;
-  background: var(--warn-bg);
-  color: var(--warn-text);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  margin-left: auto;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-tape);
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-weight: 500;
 }
 
 .conv-list {
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
   overflow-y: auto;
   list-style: none;
 }
 
 .conv-empty {
-  padding: 8px;
-  font-size: 13px;
+  padding: var(--space-2);
+  font-size: var(--text-s);
 }
 
 .conv-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 8px 10px;
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-2);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   background: transparent;
   text-align: left;
   cursor: pointer;
 }
 
 .conv-item:hover {
-  background: var(--bg-sunken);
+  background: var(--wash);
 }
 
 .conv-active,
 .conv-active:hover {
-  background: var(--accent-soft);
+  background: var(--wash);
+  box-shadow: inset 3px 0 0 var(--ink);
   font-weight: 600;
 }
 
@@ -123,100 +139,197 @@
   white-space: nowrap;
 }
 
+/* Open branches waiting for a decision. */
 .badge {
   flex: none;
   min-width: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 20px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-tape);
+  color: var(--ink);
+  font-size: var(--text-s);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
   text-align: center;
 }
 
 .sidebar-bottom {
-  border-top: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--rule);
 }
 
 .spend-line {
-  min-height: 1.4em;
-  margin-top: 8px;
-  color: var(--text-soft);
-  font-size: 12.5px;
-  text-align: center;
+  min-height: 1.45em;
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Branch side panel */
+/*
+ * Branch side panel. Its left edge is the branch's tape: a solid rail in the lane
+ * colour, with the nodes of the branch's own turns sitting on it.
+ */
 .panel {
+  --seam: 4px;
+  --axis: calc(var(--seam) + var(--tape-w) / 2);
+  --node-fill: var(--surface);
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--bg-soft);
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--rule);
+  background: var(--surface);
+  animation: panel-in 0.2s ease-out;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--seam);
+  z-index: 0;
+  border-left: var(--tape-w) var(--lane-style) var(--lane);
+  pointer-events: none;
+}
+
+@keyframes panel-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+.panel .thread::before {
+  display: none; /* the rail is the trunk here */
 }
 
 .panel-head {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4) var(--space-4) var(--gutter);
+  border-bottom: 1px solid var(--rule);
 }
 
 .panel-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .panel-title h2 {
-  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-m);
+}
+
+.panel-title h2 .fork {
+  color: var(--lane);
 }
 
 .panel-close {
   margin-left: auto;
 }
 
+/* The anchored passage, quoted in the model's voice and taped in the lane colour. */
 .panel-quote {
-  max-height: 7.8em;
-  margin: 10px 0 0;
-  padding: 6px 10px;
+  max-height: 8em;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
   overflow-y: auto;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 6px 6px 0;
-  background: var(--surface);
-  color: var(--text-soft);
-  font-size: 13.5px;
+  border-radius: var(--radius-tape);
+  background: var(--lane-tint);
+  font-family: var(--font-read);
+  font-size: var(--text-m);
+  font-style: italic;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
+[data-status="merged"] .panel-quote {
+  background: transparent;
+  padding-left: 0;
+  text-decoration: underline solid var(--lane) 2px;
+  text-underline-offset: 4px;
+}
+
+[data-status="discarded"] .panel-quote {
+  padding-left: 0;
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
 .panel-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .panel-scroll {
   flex: 1;
   min-height: 0;
-  padding: 14px;
+  padding: var(--space-5) var(--space-4) var(--space-5) 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
+.panel .thread-empty {
+  padding: 0 0 0 var(--gutter);
+}
+
 .panel-foot {
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--border);
+  padding: var(--space-2) var(--space-4) var(--space-4) var(--gutter);
+  border-top: 1px solid var(--rule);
 }
 
 .panel-closed-note {
-  padding: 8px;
-  color: var(--text-soft);
-  font-size: 13.5px;
-  text-align: center;
+  padding: var(--space-2) 0;
+  color: var(--ink-soft);
 }
 
-/* Narrow windows: the panel overlays the chat instead of squeezing it. */
+/* Toasts */
+.toasts {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(420px, calc(100vw - 2 * var(--space-4)));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+}
+
+.toast p {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Narrower windows: the panel overlays the chat instead of squeezing it. */
 @media (max-width: 1100px) {
   .layout,
   .layout.with-panel {
@@ -229,60 +342,88 @@
     right: 0;
     bottom: 0;
     z-index: 20;
-    width: min(440px, calc(100% - 60px));
-    box-shadow: var(--shadow);
+    width: min(460px, calc(100% - 48px));
   }
 }
 
-@media (max-width: 640px) {
+/* Phones: the sidebar becomes a slim top bar, the panel covers everything. */
+@media (max-width: 720px) {
   .layout,
   .layout.with-panel {
-    grid-template-columns: 0 minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat {
+    flex: 1;
   }
 
   .sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .sidebar-top {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: 0;
+  }
+
+  .brand {
+    margin: 0;
+  }
+
+  .sidebar-top .btn-block {
+    width: auto;
+  }
+
+  .sidebar-bottom {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0;
+    border-top: none;
+  }
+
+  .sidebar-bottom .btn-block {
+    width: auto;
+  }
+
+  .spend-line {
     display: none;
+  }
+
+  .conv-list {
+    display: flex;
+    flex: 1 0 100%;
+    order: 3;
+    gap: var(--space-1);
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .conv-list li {
+    flex: none;
+    max-width: 70vw;
   }
 
   .panel {
     width: 100%;
+    border-left: none;
   }
 }
 
-/* Toasts */
-.toasts {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(420px, calc(100vw - 32px));
-  pointer-events: none;
-}
-
-.toast {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 10px 10px 14px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius);
-  background: var(--danger-soft);
-  box-shadow: var(--shadow);
-  pointer-events: auto;
-}
-
-.toast p {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
-
-.toast-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }

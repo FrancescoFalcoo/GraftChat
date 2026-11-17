@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { findRootByMessageId, offsetsToRange } from "../selection";
+import { LANE_COUNT } from "../lanes";
 import type { ConversationState } from "../types";
 
 // Minimal typings for the CSS Custom Highlight API, so the code does not depend on
@@ -7,8 +8,13 @@ import type { ConversationState } from "../types";
 type HighlightRegistry = Map<string, unknown>;
 type HighlightCtor = new (...ranges: Range[]) => unknown;
 
-const GROUPS = ["open", "merged", "discarded", "active"] as const;
-type Group = (typeof GROUPS)[number];
+const KINDS = ["open", "merged", "discarded", "active"] as const;
+
+/** Every highlight name: one per lane and status (`graft-l0-open` …), "active" = in the panel. */
+const NAMES: string[] = [];
+for (let lane = 0; lane < LANE_COUNT; lane++) {
+  for (const kind of KINDS) NAMES.push(`graft-l${lane}-${kind}`);
+}
 
 function highlightApi(): { registry: HighlightRegistry; Highlight: HighlightCtor } | null {
   if (typeof CSS === "undefined") return null;
@@ -19,7 +25,7 @@ function highlightApi(): { registry: HighlightRegistry; Highlight: HighlightCtor
 
 /**
  * Tints the anchored passages of main with the CSS Custom Highlight API
- * (`::highlight(graft-open)` etc.). Progressive enhancement: does nothing where the
+ * (`::highlight(graft-l0-open)` etc., in markdown.css). Progressive enhancement: does nothing where the
  * API is missing; the chips under each message carry the same information.
  */
 export function useAnchorHighlights(
@@ -32,22 +38,27 @@ export function useAnchorHighlights(
     const scope = scopeRef.current;
     if (!hl || !scope || !state) return;
 
-    const ranges: Record<Group, Range[]> = { open: [], merged: [], discarded: [], active: [] };
+    const ranges = new Map<string, Range[]>();
     const contents = new Map(state.main.map((m) => [m.id, m.content]));
-    for (const branch of state.branches) {
+    state.branches.forEach((branch, index) => {
       const content = contents.get(branch.anchor_message_id);
       const root = findRootByMessageId(scope, branch.anchor_message_id);
-      if (content === undefined || !root) continue;
+      if (content === undefined || !root) return;
       const range = offsetsToRange(root, content, branch.anchor_start, branch.anchor_end);
-      if (range) ranges[branch.id === activeBranchId ? "active" : branch.status].push(range);
-    }
-    for (const group of GROUPS) {
-      const name = `graft-${group}`;
-      if (ranges[group].length > 0) hl.registry.set(name, new hl.Highlight(...ranges[group]));
+      if (!range) return;
+      const kind = branch.id === activeBranchId ? "active" : branch.status;
+      const name = `graft-l${index % LANE_COUNT}-${kind}`;
+      const list = ranges.get(name);
+      if (list) list.push(range);
+      else ranges.set(name, [range]);
+    });
+    for (const name of NAMES) {
+      const list = ranges.get(name);
+      if (list) hl.registry.set(name, new hl.Highlight(...list));
       else hl.registry.delete(name);
     }
     return () => {
-      for (const group of GROUPS) hl.registry.delete(`graft-${group}`);
+      for (const name of NAMES) hl.registry.delete(name);
     };
   }, [scopeRef, state, activeBranchId]);
 }

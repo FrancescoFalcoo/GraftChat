@@ -161,7 +161,7 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
             value={cap}
             onChange={(e) => setCap(e.target.value)}
           />
-          <p className="field-note">0 = free models only</p>
+          <p className="field-note">Set it to 0 to use free models only.</p>
         </div>
 
         <ModelField label="Chat model" value={chatModel} onChange={setChatModel} models={models} />

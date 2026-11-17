@@ -1,0 +1,174 @@
+/*
+ * Design tokens.
+ *
+ * Subject: grafting. The ground is pale grey-green label stock, the ink is bottle green.
+ * Every branch owns one lane colour (its "tape") that identifies it everywhere: the
+ * anchored passage, the stub on the trunk, the chip, the rail of the side panel, its
+ * block in the merge dialog and the bullets of a merge node. Green is the app itself, so
+ * there is no green lane.
+ *
+ * Contrast (WCAG 2, checked): --ink and --ink-soft reach 4.5:1 on --ground, --surface
+ * and --wash in both themes, and so does every --lane-N-ink. Text on a lane tint stays
+ * --ink. Lane solids are for lines and nodes (3:1 or more on the ground).
+ */
+:root {
+  color-scheme: light dark;
+
+  --ground: #edf2ec;
+  --surface: #f9fbf8; /* side panel, dialogs, composer */
+  --wash: #e1e9e1; /* code blocks, hover, the user's turns */
+  --rule: #c7d2c9; /* dividers */
+  --trunk: #9db0a3; /* the trunk line, one step darker than the rule */
+  --edge: #738a7e; /* boundary of form controls and buttons (3:1) */
+  --ink: #12322a;
+  --ink-soft: #55695f;
+  --on-ink: #f9fbf8;
+  --danger: #a12d1a;
+  --scrim: rgb(18 50 42 / 0.42);
+  --shadow-float: 0 10px 30px rgb(18 50 42 / 0.18); /* only what truly floats */
+
+  /* Lanes: solid for lines, nodes and underlines; ink for text. */
+  --lane-0: #2b5be8; /* cobalt */
+  --lane-0-ink: #1e46bf;
+  --lane-1: #e0492f; /* vermilion */
+  --lane-1-ink: #b5341d;
+  --lane-2: #b07e00; /* ochre: darker than #D49A00 so the line reaches 3:1 */
+  --lane-2-ink: #855c00;
+  --lane-3: #c23a93; /* orchid */
+  --lane-3-ink: #9a2874;
+  --lane-4: #7352e0; /* violet */
+  --lane-4-ink: #5538c2;
+  --lane-5: #0e90c4; /* cyan */
+  --lane-5-ink: #0a6a91;
+  --tint: 18%;
+  --tint-strong: 34%;
+
+  /* Type: the serif is the model's voice, the grotesk is everything else. */
+  --font-read: "Literata Variable", Georgia, "Times New Roman", serif;
+  --font-ui: "Schibsted Grotesk Variable", system-ui, "Segoe UI", sans-serif;
+  --font-code: "JetBrains Mono Variable", ui-monospace, Consolas, monospace;
+  --text-s: 0.8125rem; /* 13px: notes, status words */
+  --text-m: 0.9375rem; /* 15px: interface, the user's turns */
+  --text-l: 1.0625rem; /* 17px: answers */
+  --text-xl: 1.375rem; /* 22px: dialog titles, first screen */
+  --lh-ui: 1.45;
+  --lh-read: 1.6;
+  --measure: 36rem; /* under 72 characters of Literata at 17px */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Radius is small and hierarchical. */
+  --radius-tape: 2px; /* highlights, chips */
+  --radius-s: 4px; /* inputs, buttons, bands */
+  --radius-l: 10px; /* dialogs */
+
+  --sidebar-w: 248px;
+  --panel-w: minmax(380px, 36vw);
+  --col-pad: clamp(16px, 4vw, 56px);
+  --turn-gap: 28px;
+  --hit: 32px;
+
+  /* Trunk geometry, inside the gutter left of the text. */
+  --gutter: 40px;
+  --axis: 9px; /* centre of the trunk, from the left edge of the gutter */
+  --trunk-w: 2px;
+  --node: 11px;
+  --node-merge: 19px;
+  --node-color: var(--ink);
+  --node-fill: var(--ground);
+  --stub-h: 14px;
+  --stub-r: 10px;
+  --tape-w: 5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0f231d;
+    --surface: #16302a;
+    --wash: #1b3a32;
+    --rule: #2c4a40;
+    --trunk: #4a6e60;
+    --edge: #62887a;
+    --ink: #e3eee6;
+    --ink-soft: #9db3a8;
+    --on-ink: #0f231d;
+    --danger: #ff9c88;
+    --scrim: rgb(3 10 8 / 0.62);
+    --shadow-float: 0 10px 30px rgb(0 0 0 / 0.45);
+
+    --lane-0: #7fa2ff;
+    --lane-0-ink: #7fa2ff;
+    --lane-1: #ff8a73;
+    --lane-1-ink: #ff8a73;
+    --lane-2: #f0c24a;
+    --lane-2-ink: #f0c24a;
+    --lane-3: #f083c9;
+    --lane-3-ink: #f083c9;
+    --lane-4: #b09bff;
+    --lane-4-ink: #b09bff;
+    --lane-5: #5ccbea;
+    --lane-5-ink: #5ccbea;
+    --tint: 22%;
+    --tint-strong: 38%;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --gutter: 28px;
+    --axis: 7px;
+    --turn-gap: 22px;
+  }
+}
+
+/* Tints derive from the solids (translucent, so they sit on any surface). */
+:root {
+  --lane-0-tint: color-mix(in srgb, var(--lane-0) var(--tint), transparent);
+  --lane-1-tint: color-mix(in srgb, var(--lane-1) var(--tint), transparent);
+  --lane-2-tint: color-mix(in srgb, var(--lane-2) var(--tint), transparent);
+  --lane-3-tint: color-mix(in srgb, var(--lane-3) var(--tint), transparent);
+  --lane-4-tint: color-mix(in srgb, var(--lane-4) var(--tint), transparent);
+  --lane-5-tint: color-mix(in srgb, var(--lane-5) var(--tint), transparent);
+  --lane-0-tint-strong: color-mix(in srgb, var(--lane-0) var(--tint-strong), transparent);
+  --lane-1-tint-strong: color-mix(in srgb, var(--lane-1) var(--tint-strong), transparent);
+  --lane-2-tint-strong: color-mix(in srgb, var(--lane-2) var(--tint-strong), transparent);
+  --lane-3-tint-strong: color-mix(in srgb, var(--lane-3) var(--tint-strong), transparent);
+  --lane-4-tint-strong: color-mix(in srgb, var(--lane-4) var(--tint-strong), transparent);
+  --lane-5-tint-strong: color-mix(in srgb, var(--lane-5) var(--tint-strong), transparent);
+  --lane: var(--lane-0);
+  --lane-ink: var(--lane-0-ink);
+  --lane-tint: var(--lane-0-tint);
+  --lane-tint-strong: var(--lane-0-tint-strong);
+  --lane-style: solid;
+}
+
+/*
+ * An element that belongs to a branch carries data-lane="0..5" (lanes.ts) and, where it
+ * matters, data-status. Status changes the treatment, never the hue.
+ */
+[data-lane="0"] { --lane: var(--lane-0); --lane-ink: var(--lane-0-ink); --lane-tint: var(--lane-0-tint); --lane-tint-strong: var(--lane-0-tint-strong); }
+[data-lane="1"] { --lane: var(--lane-1); --lane-ink: var(--lane-1-ink); --lane-tint: var(--lane-1-tint); --lane-tint-strong: var(--lane-1-tint-strong); }
+[data-lane="2"] { --lane: var(--lane-2); --lane-ink: var(--lane-2-ink); --lane-tint: var(--lane-2-tint); --lane-tint-strong: var(--lane-2-tint-strong); }
+[data-lane="3"] { --lane: var(--lane-3); --lane-ink: var(--lane-3-ink); --lane-tint: var(--lane-3-tint); --lane-tint-strong: var(--lane-3-tint-strong); }
+[data-lane="4"] { --lane: var(--lane-4); --lane-ink: var(--lane-4-ink); --lane-tint: var(--lane-4-tint); --lane-tint-strong: var(--lane-4-tint-strong); }
+[data-lane="5"] { --lane: var(--lane-5); --lane-ink: var(--lane-5-ink); --lane-tint: var(--lane-5-tint); --lane-tint-strong: var(--lane-5-tint-strong); }
+
+/* open = tint + solid line; merged = line only; discarded = grey and dashed. */
+[data-status="merged"] {
+  --lane-tint: transparent;
+}
+
+[data-status="discarded"],
+[data-decision="discard"] {
+  --lane: var(--trunk);
+  --lane-ink: var(--ink-soft);
+  --lane-tint: transparent;
+  --lane-tint-strong: var(--wash);
+  --lane-style: dashed;
+}

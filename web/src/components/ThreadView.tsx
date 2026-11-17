@@ -46,15 +46,19 @@ export function ThreadView({
     <div className="thread">
       {messages.map((m) => {
         if (m.role === "merge") {
-          return <div key={m.id}>{renderMerge ? renderMerge(m) : null}</div>;
+          return (
+            <div key={m.id} className="turn turn-merge">
+              {renderMerge ? renderMerge(m) : null}
+            </div>
+          );
         }
         if (m.role === "user") {
           return (
-            <div key={m.id} className="msg msg-user">
-              <div className="bubble">{m.content}</div>
+            <div key={m.id} className="turn turn-user msg msg-user">
+              <div className="user-text">{m.content}</div>
               {dangling && last?.id === m.id && (
                 <div className="dangling" role="group" aria-label="No reply was received">
-                  <span className="dangling-note">No reply was received.</span>
+                  <span className="dangling-note">No reply was received. Retry, or delete this message.</span>
                   <button type="button" className="btn btn-small btn-primary" onClick={onRetry}>
                     Retry
                   </button>
@@ -67,19 +71,19 @@ export function ThreadView({
           );
         }
         return (
-          <div key={m.id} className="msg msg-assistant">
+          <div key={m.id} className="turn turn-assistant msg msg-assistant">
             <MessageContent content={m.content} messageId={m.id} selectable={selectable} />
             {renderBelow ? renderBelow(m) : null}
           </div>
         );
       })}
       {pending && pending.text !== null && (
-        <div className="msg msg-user msg-optimistic">
-          <div className="bubble">{pending.text}</div>
+        <div className="turn turn-user msg msg-user msg-optimistic">
+          <div className="user-text">{pending.text}</div>
         </div>
       )}
       {pending && (
-        <div className="msg msg-assistant thinking" role="status">
+        <div className="turn turn-assistant turn-thinking thinking" role="status">
           <span className="spinner" aria-hidden="true" />
           Thinking…
         </div>

@@ -246,7 +246,7 @@ describe("MergeDialog", () => {
     expect(screen.getByRole("button", { name: "Apply" })).toHaveProperty("disabled", true);
     fireEvent.blur(area);
 
-    await within(alpha).findByText("edited");
+    await within(alpha).findByText("Edited");
     expect(server.callsTo("/api/points/")).toEqual([
       { method: "PATCH", url: "/api/points/101", body: { text_final: "My own wording" } },
     ]);
@@ -255,7 +255,7 @@ describe("MergeDialog", () => {
     );
 
     fireEvent.click(within(alpha).getByRole("button", { name: "Reset to generated" }));
-    await waitFor(() => expect(within(alpha).queryByText("edited")).toBeNull());
+    await waitFor(() => expect(within(alpha).queryByText("Edited")).toBeNull());
     expect(server.callsTo("/api/points/")[1].body).toEqual({ text_final: "Text B of branch 1" });
     expect((within(alpha).getByRole("textbox") as HTMLTextAreaElement).value).toBe(
       "Text B of branch 1",

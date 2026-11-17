@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { ForkIcon } from "./Marks";
 import { findAnchorRoot, rangeToSelection, type AnchorSelection } from "../selection";
 
 interface Props {
@@ -108,7 +109,8 @@ export function SelectionPopover({ scopeRef, contentOf, onOpen }: Props) {
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => void open()}
     >
-      <span aria-hidden="true">⑂</span> {busy ? "Opening…" : "Open branch"}
+      <ForkIcon />
+      {busy ? "Opening…" : "Open branch"}
     </button>
   );
 }
