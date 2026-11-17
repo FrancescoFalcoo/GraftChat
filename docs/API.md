@@ -29,8 +29,9 @@ The server listens on `127.0.0.1` only. Rules and vocabulary come from [DESIGN.m
 | `provider_error` | 502 | any other provider failure (after retries) |
 | `takeaway_parse` | 502 | the model did not return a usable take-away |
 
-Images: a `validation` error is also returned for a bad image (wrong type, too large, too
-many, not base64) and when the chosen model is known not to accept images.
+Files: a `validation` error is also returned for a bad file (unsupported type, too large,
+too many, not base64, a document with no readable text) and when the chosen model is known
+not to accept images.
 
 ## Shapes
 
@@ -40,10 +41,12 @@ type BranchStatus = "open" | "merged" | "discarded";
 
 interface Attachment {
   id: number;
-  kind: "image";
-  mime: string;               // image/png | image/jpeg | image/gif | image/webp (from the bytes)
+  kind: "image" | "document";
+  mime: string;               // images: image/png | image/jpeg | image/gif | image/webp (from the bytes)
+                              // documents: application/pdf | …wordprocessingml.document | text/plain
   name: string;
-  size: number;               // bytes
+  size: number;               // bytes of the file
+  chars: number | null;       // documents: characters of text the model receives; null for images
 }
 
 interface Message {
@@ -51,9 +54,9 @@ interface Message {
   branch_id: number | null;   // null = main
   parent_id: number | null;
   role: Role;
-  content: string;            // "" for merge nodes; may be "" for a user message with images
+  content: string;            // "" for merge nodes; may be "" for a user message with files
   created_at: string;
-  attachments: Attachment[];  // [] except on user messages sent with images
+  attachments: Attachment[];  // [] except on user messages sent with files
 }
 
 interface Point {
@@ -145,17 +148,20 @@ first user message.
 
 | method | path | body | returns |
 |---|---|---|---|
-| POST | `/api/conversations/{id}/messages` | `{ content: string, branch_id?: number \| null, images?: ImageIn[] }` | `ConversationState` |
+| POST | `/api/conversations/{id}/messages` | `{ content: string, branch_id?: number \| null, files?: FileIn[] }` | `ConversationState` |
 | POST | `/api/conversations/{id}/generate` | `{ branch_id?: number \| null }` | `ConversationState` |
 | DELETE | `/api/messages/{id}` | – | `ConversationState` |
-| GET | `/api/attachments/{id}` | – | the image bytes, with its MIME type |
+| GET | `/api/attachments/{id}` | – | an image inline with its MIME type; a document as a download (`application/octet-stream`, `Content-Disposition: attachment`) |
 
 ```ts
-interface ImageIn { name: string; mime?: string; data: string } // data: base64, no "data:" prefix
+interface FileIn { name: string; mime?: string; data: string } // data: base64, no "data:" prefix
 ```
 
+`images` is accepted as an older name of `files`. Up to 6 files per message. A file is an
+image if its first bytes say so; otherwise it must be a document (below).
+
 **Images.** Up to 4 per message, 5 MB each, PNG, JPEG, GIF or WebP. The type is recognised
-from the bytes (`mime` is informative). `content` may be empty when there are images. The
+from the bytes (`mime` is informative). `content` may be empty when there are files. The
 images are stored with the user message and sent to the model with it every time that
 message is part of a context, as OpenAI-style `image_url` parts with base64 data URLs; the
 call log records them as `attachment:<id>`. If the chosen model appears in OpenRouter's list
@@ -163,6 +169,22 @@ as not accepting images, a message with images is refused (`validation`) before 
 stored, and images already in the history are replaced by the note
 `[image not sent: the selected model does not accept images]`. A model typed by hand, or a
 list that cannot be fetched, counts as unknown: the images are sent and the provider decides.
+
+**Documents.** PDF (recognised by `%PDF-`), Word `.docx`, or plain text and source code (by
+extension: `.txt`, `.md`, `.csv`, `.json`, `.py`, `.ts`, … — the list is
+`TEXT_EXTENSIONS` in `api/documents.py`), up to 10 MB each. The server reads each to text when
+it arrives; a document with no text (a scanned PDF), encrypted, not decodable, or with more
+than 200,000 characters is refused (`validation`) and nothing is stored. The model receives
+the text after the message, one block per document:
+
+```text
+<document name="report.pdf">
+[page 1]
+…
+</document>
+```
+
+The call log contains these blocks in full: they are exactly what the model read.
 
 `POST …/messages` stores the user message, calls the model and stores the reply.
 

@@ -13,6 +13,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-17 | Editorial pass: neutral tone; §9 Ownership written as prose; §4, §8 and §12 aligned with the implementation. |
 | 2026-11-17 | Conversation map added to the v1 scope (§4); the timeline view stays in the backlog. |
 | 2026-11-17 | A branch starts from main as it was when it was opened: it sees the take-aways merged before that moment, even after its anchor (§7, §14.11; `branch.base_message_id` in §6). Images on user messages added to the v1 scope (§4, §6, §14.12). |
+| 2026-11-17 | Documents on user messages (PDF, Word, plain text and code), read to text locally (§4, §6, §14.13). |
 
 ## 1. Problem
 
@@ -46,6 +47,7 @@ In:
 - Select text in an assistant message → open branch in side panel.
 - Branch chat.
 - Images on user messages (PNG, JPEG, GIF, WebP; up to 4 per message), sent to models that accept them (§14.12).
+- Documents on user messages (PDF with a text layer, Word .docx, plain text and source code), sent to any model as their text (§14.13).
 - Merge with per-branch take-away, per-point include/exclude.
 - Return-to-main warning.
 - Conversation map: the current conversation drawn as a graph. Main is a vertical trunk with one node per prompt and per merge; each branch leaves the trunk at its anchor in its own colour, with one node per prompt, and merged branches come back into the trunk at their merge node. Nodes are labelled by the first words of the prompt; clicking one shows that prompt.
@@ -56,7 +58,7 @@ In:
 Out (v2 backlog, §10):
 
 - Branches of branches (depth = 1).
-- Files other than images (PDF, text, code).
+- Scanned PDFs (no OCR), spreadsheets, presentations, archives.
 - More than one side panel open at a time.
 - Streaming, multiple providers, a timeline view.
 - Editing past messages.
@@ -102,12 +104,13 @@ branch(
                            -- NULL for branches stored before it existed (= the anchor)
 )
 
-attachment(                -- images of a user message (§14.12); not part of core
+attachment(                -- files of a user message (§14.12, §14.13); not part of core
   id, message_id,
   position,
-  kind,                    -- image
+  kind,                    -- image | document
   mime, name, size,
-  data BLOB,
+  data BLOB,               -- the original file
+  text NULL,               -- documents: the extracted text, what the model receives
   created_at
 )
 
@@ -173,7 +176,7 @@ Claude Code may also review the core code.
 ## 10. v2 backlog
 
 - Sequential merge at the graft point: merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows what branch 2 explained). Since §14.11 this already holds when branch N is merged *before* branch N+1 is opened; what remains is the case of branches open at the same time, which deliberately breaks sibling isolation. Worth testing as an experimental condition E.
-- Files other than images: PDF (OpenRouter parses them, some engines at a cost), plain text and code (inlined in delimiters, like the merge blocks).
+- OCR for scanned PDFs (today: send the pages as images), spreadsheets (.xlsx) and presentations (.pptx) read to text.
 - Depth > 1.
 - Multiple panels, a timeline view, streaming, more providers (Anthropic, Gemini, Ollama).
 - Trash & restore for discarded branches (DISCARDED → OPEN).
@@ -239,3 +242,7 @@ Rationale: keeping these rules in core (not in `api/`) makes them unit-testable 
 - *Stored branches.* `base_message_id` is NULL for branches stored before it existed; NULL means "the anchor", which is the old behaviour, so their contexts do not change.
 
 **14.12** Images on user messages. They are stored in an `attachment` table outside `core`: the model input that `core.context` builds stays text, and each `ContextMessage` carries `source_id`, the stored message it renders, so the API can attach that message's images. The same rule as for text applies: an image is sent wherever its message is part of a context (main, and branches whose anchor comes after it). Validation: PNG, JPEG, GIF or WebP recognised by their first bytes, at most 4 per message, 5 MB each. A message with images is refused (`validation`) when the chosen model is known, from OpenRouter's model list, not to accept images; images already in the history are then replaced by a short note in the text, so the call does not fail and the log shows what was left out. The call log stores images as `attachment:<id>` references, not their bytes. The take-away prompt names the images of the branch (`[image attached: <name>]`) but does not send them.
+
+**14.13** Documents on user messages: PDF (read with `pypdf`, page by page, marked `[page N]`), Word `.docx` (paragraph text from `word/document.xml`, standard library only) and plain text or source code (by extension, decoded as UTF-8 or UTF-16 with a BOM). Each is read to text **on this computer when it is attached** (`api/documents.py`); the original file is kept to be downloaded again. The model receives the text after what the user typed, one block per document between `<document name="…">` and `</document>`, wherever the message is part of a context, exactly like an image (14.12). Limits: 10 MB per file, 200,000 characters of text, 6 files per message (images included).
+
+Rationale: OpenRouter can parse PDFs itself, but then the model reads a text the app never sees, and some parsing engines are charged. Extracting locally keeps "no hidden state": the call log holds exactly the text the model read, it costs nothing, and it works with every model, including text-only ones. The price is that a scanned PDF has no text to read; it is refused with a message that suggests sending its pages as images. A document is only ever downloaded, never shown inline, so an `.html` file cannot run in the app's page.

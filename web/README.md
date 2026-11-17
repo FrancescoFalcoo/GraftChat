@@ -32,7 +32,7 @@ The backend serves `web/dist` at `/` in production; all requests go to `/api/...
 - `src/selection.ts`: DOM selection to code point offsets and back (branch anchors).
 - `src/api.ts`, `src/types.ts`: typed API client and the shapes from `docs/API.md`.
 - `src/hooks/useGraft.ts`: application state and actions.
-- `src/images.ts`, `src/components/Composer.tsx`: images on a message (pick, paste, drop;
+- `src/files.ts`, `src/components/Composer.tsx`: images and documents on a message (pick, paste, drop;
   the same limits as the server).
 - `src/components/`: sidebar, main chat, branch panel, merge dialog, settings.
 - `src/test/`: unit and component tests.

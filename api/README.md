@@ -60,6 +60,9 @@ The server binds to `127.0.0.1` only: it has no authentication and it holds the 
   belong to, logged as `attachment:<id>`. The type is sniffed from the bytes; only PNG, JPEG,
   GIF and WebP are accepted, so the route never serves HTML or SVG. Whether the chosen model
   takes images comes from OpenRouter's model list (`architecture.input_modalities`).
+- **Documents.** `documents.py` reads PDF (`pypdf`), `.docx` (standard library) and text or
+  code files to text when they are attached; the text is stored next to the file (`attachment.text`)
+  and sent between `<document>` delimiters. Documents are served only as downloads.
 - **Merge nodes.** A merge joins the merge node at the end of main only if no branch was
   opened from it since (`core.tree.reusable_merge_node`, DESIGN §14.11); otherwise a new node
   is appended.

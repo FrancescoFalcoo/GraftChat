@@ -37,8 +37,9 @@ Ok, what do I do first with the images?
 
 A branch that is never merged contributes nothing.
 
-You can also attach images to a message (paste, drop or the clip button): they reach models
-that accept images, marked "images" in the model list in Settings.
+You can also attach files to a message (paste, drop or the clip button). Images reach models
+that accept them, marked "images" in Settings. PDFs, Word files and text or code files are read
+to text on your computer and work with every model.
 
 ## Quick start
 
@@ -74,7 +75,8 @@ GRAFTCHAT_FAKE_LLM=1 python -m api          # PowerShell: $env:GRAFTCHAT_FAKE_LL
   refuses the call once the cap is reached. A cap of 0 means free models only.
 - **Everything is logged locally.** Each model call is stored in a local SQLite database
   with the exact messages that were sent, so what the model saw can always be checked.
-  Attached images are stored in the same database and sent only to OpenRouter.
+  Attached files are stored in the same database and sent only to OpenRouter; documents are
+  read to text locally, and the log shows that text exactly as the model received it.
 
 ## Research question
 
@@ -128,7 +130,7 @@ v1 is feature-complete: chat, branches, merge with take-aways, bring-your-own-ke
 and call logging all work end to end. Next comes the experiment.
 
 Out of scope for v1, by design: branches of branches, streaming, several providers, editing
-past messages, files other than images. The backlog is in [DESIGN.md §10](docs/DESIGN.md#10-v2-backlog).
+past messages, scanned PDFs (no OCR). The backlog is in [DESIGN.md §10](docs/DESIGN.md#10-v2-backlog).
 
 ## License
 
