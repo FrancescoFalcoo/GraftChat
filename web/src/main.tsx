@@ -11,6 +11,7 @@ import "./styles/layout.css";
 import "./styles/thread.css";
 import "./styles/markdown.css";
 import "./styles/dialogs.css";
+import "./styles/map.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element");

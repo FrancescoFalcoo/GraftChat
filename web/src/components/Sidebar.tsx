@@ -9,6 +9,8 @@ interface Props {
   onNewChat: () => void;
   onSelect: (id: number) => void;
   onOpenSettings: () => void;
+  /** Opens the conversation map; null when there is no conversation to map. */
+  onOpenMap: (() => void) | null;
 }
 
 function spendLine(settings: Settings | null): string {
@@ -24,6 +26,7 @@ export function Sidebar({
   onNewChat,
   onSelect,
   onOpenSettings,
+  onOpenMap,
 }: Props) {
   return (
     <nav className="sidebar" aria-label="Conversations">
@@ -68,6 +71,14 @@ export function Sidebar({
       </ul>
 
       <div className="sidebar-bottom">
+        <button
+          type="button"
+          className="btn btn-block"
+          onClick={onOpenMap ?? undefined}
+          disabled={onOpenMap === null}
+        >
+          Conversation map
+        </button>
         <button type="button" className="btn btn-block" onClick={onOpenSettings}>
           Settings
         </button>

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { BranchPanel } from "./components/BranchPanel";
+import { ConversationMap } from "./components/ConversationMap";
 import { MainChat } from "./components/MainChat";
 import { MergeDialog } from "./components/MergeDialog";
 import { DevNotice, ReturnBanner, Toasts } from "./components/Notices";
@@ -13,6 +15,25 @@ export function App() {
   const { state } = g;
   const panelBranch = state?.branches.find((b) => b.id === g.panelBranchId) ?? null;
   const pendingCount = state ? pendingBranches(state).length : 0;
+  const [mapOpen, setMapOpen] = useState(false);
+
+  /** From the map: show the prompt, opening its branch in the side panel if needed. */
+  const jumpTo = (messageId: number, branchId: number | null): void => {
+    setMapOpen(false);
+    if (branchId !== null) g.openPanel(branchId);
+    // After the dialog is gone and the panel has rendered (and scrolled to its end).
+    window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-turn-id="${messageId}"]`);
+      if (!el) return;
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+      el.classList.remove("turn-flash");
+      void el.offsetWidth; // restart the animation when the same prompt is chosen again
+      el.classList.add("turn-flash");
+      window.setTimeout(() => el.classList.remove("turn-flash"), 1700);
+    }, 150);
+  };
+
   const showBanner =
     panelBranch === null && pendingCount > 0 && !g.bannerDismissed && g.mergeFocus === null;
 
@@ -27,6 +48,7 @@ export function App() {
           onNewChat={() => void g.newChat()}
           onSelect={(id) => void g.openConversation(id)}
           onOpenSettings={g.openSettings}
+          onOpenMap={state && state.main.length > 0 ? () => setMapOpen(true) : null}
         />
         <MainChat
           state={state}
@@ -75,6 +97,17 @@ export function App() {
           }}
           onError={g.pushError}
           onModelCall={g.afterModelCall}
+        />
+      )}
+      {mapOpen && state && (
+        <ConversationMap
+          state={state}
+          onJump={jumpTo}
+          onOpenBranch={(id) => {
+            setMapOpen(false);
+            g.openPanel(id);
+          }}
+          onClose={() => setMapOpen(false)}
         />
       )}
       {g.settingsOpen && g.settings && (

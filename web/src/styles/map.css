@@ -1,0 +1,219 @@
+/*
+ * Conversation map (components/ConversationMap.tsx): the trunk of main with one node per
+ * prompt, branches hanging from it in their lane colour, merges as rings.
+ */
+
+.map,
+.map ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.map {
+  position: relative;
+  padding-left: var(--space-1);
+}
+
+/* The trunk: one line behind every row of main. */
+.map::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: calc(var(--space-1) + 11px);
+  width: var(--trunk-w);
+  background: var(--trunk);
+}
+
+.map-row {
+  position: relative;
+}
+
+.map-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-m);
+  text-align: left;
+  cursor: pointer;
+}
+
+.map-node:hover {
+  background: var(--wash);
+}
+
+.map-node:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.map-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A prompt: a hollow ring on its line, like the user's turns in the chat. */
+.map-dot {
+  flex: none;
+  z-index: 1;
+  width: 10px;
+  height: 10px;
+  margin-left: 1px;
+  border: 2px solid var(--node-line, var(--ink));
+  border-radius: 50%;
+  background: var(--ground);
+}
+
+/* A merge: the larger ring of the chat's merge nodes. */
+.map-ring {
+  flex: none;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  margin-left: -1px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--ground);
+}
+
+.map-merge .map-label {
+  color: var(--ink-soft);
+}
+
+.map-merged {
+  color: var(--lane-ink);
+}
+
+/* Branches hang to the right of the trunk, each on a line of its lane colour. */
+.map .map-branches {
+  margin: 0 0 var(--space-2) 34px;
+}
+
+.map-branch {
+  position: relative;
+  padding-left: var(--space-4);
+}
+
+/* The stub leaving the trunk, then the lane going down. */
+.map-branch::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -19px; /* starts on the trunk */
+  width: 27px;
+  height: 16px;
+  border-left: var(--trunk-w) solid var(--lane);
+  border-bottom: var(--trunk-w) solid var(--lane);
+  border-bottom-left-radius: 10px;
+}
+
+.map-branch::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 12px;
+  left: calc(var(--space-4) + 12px);
+  width: var(--trunk-w);
+  background: var(--lane);
+}
+
+.map-branch[data-status="discarded"]::before {
+  border-left-style: dashed;
+  border-bottom-style: dashed;
+}
+
+.map-branch[data-status="discarded"]::after {
+  background: none;
+  border-left: var(--trunk-w) dashed var(--lane);
+}
+
+.map-branch-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-tape);
+  background: var(--lane-tint);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-s);
+  cursor: pointer;
+}
+
+.map-branch-head:hover {
+  background: var(--lane-tint-strong);
+}
+
+.map-branch-head:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.map-branch-head svg {
+  color: var(--lane);
+}
+
+.map-quote {
+  font-family: var(--font-read);
+  font-style: italic;
+}
+
+.map-status {
+  color: var(--ink-soft);
+}
+
+.map-branch[data-status="discarded"] .map-quote {
+  text-decoration: line-through;
+}
+
+.map-lane .map-node {
+  --node-line: var(--lane);
+}
+
+.map-empty-branch {
+  margin: 0 0 var(--space-2) calc(var(--space-5) + 4px);
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+}
+
+/* The prompt reached from the map flashes once in the chat. */
+.turn-flash .user-text {
+  animation: turn-flash 1.6s ease-out;
+}
+
+@keyframes turn-flash {
+  from {
+    box-shadow: 0 0 0 3px var(--ink);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-flash .user-text {
+    animation: none;
+    outline: 3px solid var(--ink);
+  }
+}
+
+/* Two stacked buttons at the bottom of the sidebar: map, then settings. */
+@media (min-width: 721px) {
+  .sidebar-bottom .btn-block + .btn-block {
+    margin-top: var(--space-2);
+  }
+}

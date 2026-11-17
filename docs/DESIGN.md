@@ -11,6 +11,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-15 | Added §14.5 branch state machine and §14.6 `merge_branch` checks; restore, archive and multiple merges added to the v2 backlog (§10). |
 | 2026-11-16 | Added §14.7–§14.10 (what `check_invariants` and `pending_branches` cover, context building details). `api/` and `web/` implemented against [API.md](API.md). |
 | 2026-11-17 | Editorial pass: neutral tone; §9 Ownership written as prose; §4, §8 and §12 aligned with the implementation. |
+| 2026-11-17 | Conversation map added to the v1 scope (§4); the timeline view stays in the backlog. |
 
 ## 1. Problem
 
@@ -45,13 +46,14 @@ In:
 - Branch chat.
 - Merge with per-branch take-away, per-point include/exclude.
 - Return-to-main warning.
+- Conversation map: the tree of the current conversation (main, branches, merges) with one node per prompt, labelled by its first words; clicking a node shows that prompt.
 - Logging of every LLM call (for the experiment).
 
 Out (v2 backlog, §10):
 
 - Branches of branches (depth = 1).
 - More than one side panel open at a time.
-- Streaming, multiple providers, timeline/graph view.
+- Streaming, multiple providers, a timeline view.
 - Editing past messages.
 - Merging anywhere other than the current end of main.
 
@@ -155,7 +157,7 @@ Claude Code may also review the core code.
 
 - Sequential merge at the graft point: merge branch N right where branch N+1 starts, so later branches build on what earlier ones explained (e.g. "explain using what I already know": branch 3 knows what branch 2 explained). Note: this deliberately breaks sibling isolation. Worth testing as an experimental condition E.
 - Depth > 1.
-- Multiple panels, timeline/graph view, streaming, more providers (Anthropic, Gemini, Ollama).
+- Multiple panels, a timeline view, streaming, more providers (Anthropic, Gemini, Ollama).
 - Trash & restore for discarded branches (DISCARDED → OPEN).
 - Archive merged branches: a UI visibility flag, separate from status; take-aways stay in context.
 - Multiple merges per branch: needs a `merge_event` table (`id, branch_id, merge_message_id, up_to_message_id`), take-aways attached to merge events instead of branches, and incremental summaries covering only messages since the previous merge.

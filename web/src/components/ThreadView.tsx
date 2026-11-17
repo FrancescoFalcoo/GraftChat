@@ -47,14 +47,14 @@ export function ThreadView({
       {messages.map((m) => {
         if (m.role === "merge") {
           return (
-            <div key={m.id} className="turn turn-merge">
+            <div key={m.id} className="turn turn-merge" data-turn-id={m.id}>
               {renderMerge ? renderMerge(m) : null}
             </div>
           );
         }
         if (m.role === "user") {
           return (
-            <div key={m.id} className="turn turn-user msg msg-user">
+            <div key={m.id} className="turn turn-user msg msg-user" data-turn-id={m.id}>
               <div className="user-text">{m.content}</div>
               {dangling && last?.id === m.id && (
                 <div className="dangling" role="group" aria-label="No reply was received">
@@ -71,7 +71,7 @@ export function ThreadView({
           );
         }
         return (
-          <div key={m.id} className="turn turn-assistant msg msg-assistant">
+          <div key={m.id} className="turn turn-assistant msg msg-assistant" data-turn-id={m.id}>
             <MessageContent content={m.content} messageId={m.id} selectable={selectable} />
             {renderBelow ? renderBelow(m) : null}
           </div>
