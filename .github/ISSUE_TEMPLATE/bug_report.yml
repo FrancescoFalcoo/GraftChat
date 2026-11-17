@@ -1,0 +1,55 @@
+name: Bug report
+description: Something does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A security problem goes in the **Security** tab
+        (Report a vulnerability), not here: see SECURITY.md.
+        Never paste your API key, not even part of it.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        1. Opened a branch on the second point of an answer
+        2. Clicked Merge…
+        3. Expected the checklist, got an error "…"
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message or terminal output
+      description: The text of the error in the app, or the last lines printed by `python start.py`.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: GraftChat version
+      description: The release (for example v1.0.0) or the commit (`git log -1 --format=%h`).
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The model chosen in Settings, or "fake" if you used `--fake`.
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: Edge 131, Firefox 133…

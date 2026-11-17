@@ -1,0 +1,29 @@
+name: Idea
+description: Suggest a feature or a change.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing, check the v2 backlog in docs/DESIGN.md §10: your idea may already be planned.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is hard or impossible today? A concrete example of a conversation helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How it could work, from the point of view of someone using the app.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: What the model would see
+      description: |
+        Optional. GraftChat's rule is "no hidden state": if your idea changes what is sent to
+        the model, describe what it would receive.
