@@ -16,6 +16,9 @@ Environment variables:
     Folder of the built frontend to serve at ``/``. Default: ``web/dist``.
 ``OPENROUTER_API_KEY``
     If set, it wins over the key saved from the UI.
+
+They can also be written in a ``.env`` file at the root of the repository (see
+``.env.example``). A variable already set in the environment wins over the file.
 """
 
 from __future__ import annotations
@@ -40,7 +43,31 @@ class Config:
         return self.home / "settings.json"
 
 
+def load_dotenv(path: Path) -> None:
+    """Put the ``NAME=value`` lines of ``path`` into the environment, unless already set.
+
+    Blank lines and ``#`` comments are skipped; values may be quoted. A missing file
+    is not an error: ``.env`` is optional.
+    """
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (FileNotFoundError, OSError, UnicodeDecodeError):
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip().removeprefix("export ").strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if name and value and name not in os.environ:
+            os.environ[name] = value
+
+
 def load_config() -> Config:
+    load_dotenv(REPO_ROOT / ".env")
     home = Path(os.environ.get("GRAFTCHAT_HOME") or Path.home() / ".graftchat")
     db_path = Path(os.environ.get("GRAFTCHAT_DB") or home / "graftchat.db")
     return Config(

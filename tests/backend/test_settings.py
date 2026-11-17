@@ -51,3 +51,32 @@ def test_key_hint_never_shows_a_short_key():
     assert key_hint(None) is None
     assert key_hint("sk-or-v1-abcdefgh1234") == "…1234"
     assert key_hint("short") == "…"
+
+
+# --- .env ---------------------------------------------------------------------------------
+
+
+def test_dotenv_fills_the_environment_without_overriding_it(tmp_path, monkeypatch):
+    from api.config import load_dotenv
+
+    monkeypatch.delenv("GRAFTCHAT_TEST_A", raising=False)
+    monkeypatch.delenv("GRAFTCHAT_TEST_C", raising=False)
+    monkeypatch.setenv("GRAFTCHAT_TEST_B", "from shell")
+    env = tmp_path / ".env"
+    env.write_text(
+        '# comment\n\nGRAFTCHAT_TEST_A="quoted value"\nGRAFTCHAT_TEST_B=from file\nGRAFTCHAT_TEST_C=\n',
+        encoding="utf-8",
+    )
+    load_dotenv(env)
+    import os
+
+    assert os.environ["GRAFTCHAT_TEST_A"] == "quoted value"
+    assert os.environ["GRAFTCHAT_TEST_B"] == "from shell"
+    assert "GRAFTCHAT_TEST_C" not in os.environ  # an empty value means "not set"
+    monkeypatch.delenv("GRAFTCHAT_TEST_A")
+
+
+def test_missing_dotenv_is_fine(tmp_path):
+    from api.config import load_dotenv
+
+    load_dotenv(tmp_path / "nothing")
