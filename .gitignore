@@ -27,6 +27,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Personal guide to the repository, kept local
+# Personal guides (the repository, the experiment), kept local
 docs/GUIDA.md
 docs/GUIDA.pdf
+docs/ESPERIMENTO.md
+docs/ESPERIMENTO.pdf
