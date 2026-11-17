@@ -6,6 +6,8 @@
 **Anchored branching chat for LLMs.** Graft a side conversation onto any passage of an
 answer, then bring back only what matters.
 
+![Select a passage of an answer, ask about it in a branch, merge back the points worth keeping, then see the whole conversation as a tree](docs/demo.gif)
+
 ## The problem
 
 LLM chats are linear. When an answer has several points and you want to dig into two of them
@@ -41,6 +43,9 @@ The **conversation map** draws the whole chat as a tree: main as a trunk, each b
 own colour, merges as knots. It is always visible in small at the bottom of the sidebar and
 opens full screen with zoom, the details of every prompt and a **logbook** of what each merge
 brought back. Take-aways can be completed by hand too: add your own points before merging.
+
+Turn on **Show tokens and cost** in Settings to see, under every answer, how many tokens of
+context were sent and what the call cost, with totals for each branch and for the whole chat.
 
 You can also attach files to a message (paste, drop or the clip button). Images reach models
 that accept them, marked "images" in Settings. PDFs, Word files and text or code files are read
