@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "../components/Composer";
+import { recommendedModel } from "../components/SettingsModal";
 import { fileKind, fileProblem, MAX_FILES, MAX_IMAGE_BYTES, MAX_IMAGES } from "../files";
 import type { Branch, ConversationState, Message, Point } from "../types";
 import { knownMerges } from "../util";
@@ -124,5 +125,20 @@ describe("Composer with images", () => {
     expect(screen.getByAltText("ok.png")).toBeTruthy();
     expect(screen.getByText("notes.md")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toMatch(/bad\.bmp/);
+  });
+});
+
+describe("recommendedModel", () => {
+  const m = (id: string, images = false) => ({ id, name: id, context_length: null, images });
+
+  it("prefers the known good free models", () => {
+    expect(recommendedModel([m("a/x:free"), m("google/gemma-4-26b-a4b-it:free"), m("google/gemma-4-31b-it:free")])).toBe(
+      "google/gemma-4-31b-it:free",
+    );
+  });
+
+  it("falls back to a model that takes images, never to the random router", () => {
+    expect(recommendedModel([m("openrouter/free", true), m("a/text:free"), m("b/vision:free", true)])).toBe("b/vision:free");
+    expect(recommendedModel([m("openrouter/free", true)])).toBeNull();
   });
 });

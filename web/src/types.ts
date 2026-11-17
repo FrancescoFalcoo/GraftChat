@@ -75,11 +75,20 @@ export interface Settings {
   has_api_key: boolean;
   api_key_hint: string | null;
   api_key_from_env: boolean;
+  /** What OpenRouter said about the key when it was last saved (null if not checked). */
+  key_info: KeyInfo | null;
   spend_cap_usd: number;
   chat_model: string | null;
   takeaway_model: string | null;
   month_spend_usd: number;
   fake_llm: boolean;
+}
+
+export interface KeyInfo {
+  label: string | null;
+  is_free_tier: boolean;
+  free_daily_limit: number | null;
+  free_daily_remaining: number | null;
 }
 
 export interface SettingsUpdate {

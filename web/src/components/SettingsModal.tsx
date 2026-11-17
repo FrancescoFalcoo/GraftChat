@@ -59,6 +59,30 @@ function ModelField({ label, value, onChange, models, disabled = false }: ModelF
   );
 }
 
+/** Good free models to start with, in order of preference: picked when none is chosen yet. */
+const RECOMMENDED = ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free"];
+
+export function recommendedModel(models: Model[]): string | null {
+  for (const id of RECOMMENDED) if (models.some((m) => m.id === id)) return id;
+  const stable = models.filter((m) => m.id !== "openrouter/free"); // a router: a random model each call
+  return (stable.find((m) => m.images) ?? stable[0])?.id ?? null;
+}
+
+function KeyStatus({ info }: { info: Settings["key_info"] }) {
+  if (!info) return null;
+  const { free_daily_limit: limit, free_daily_remaining: left } = info;
+  let quota = "";
+  if (limit !== null) {
+    quota = left !== null ? ` ${left} of ${limit} free-model requests left today.` : ` ${limit} free-model requests per day.`;
+  }
+  return (
+    <p className="field-note key-ok">
+      Key accepted by OpenRouter{info.label ? ` (${info.label})` : ""}.{quota}
+      {info.is_free_tier && " Buying 10 credits once raises the free-model limit from 50 to 1,000 requests a day."}
+    </p>
+  );
+}
+
 export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
   const [apiKey, setApiKey] = useState("");
   const [cap, setCap] = useState(String(settings.spend_cap_usd));
@@ -77,12 +101,28 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
     let cancelled = false;
     api
       .models()
-      .then((list) => !cancelled && setModels(list))
+      .then((list) => {
+        if (cancelled) return;
+        setModels(list);
+        // First run: start from a good free model instead of an empty field.
+        if (!settings.chat_model) setChatModel((current) => current || recommendedModel(list) || "");
+      })
       .catch(() => !cancelled && setModels("failed"));
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const [connecting, setConnecting] = useState(false);
+  const connect = async (): Promise<void> => {
+    setConnecting(true);
+    try {
+      window.location.assign(await api.oauthStart()); // OpenRouter sends the browser back here
+    } catch (err) {
+      onError(err);
+      setConnecting(false);
+    }
+  };
 
   const save = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
@@ -119,6 +159,29 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
   return (
     <Modal title="Settings" onClose={onClose}>
       <form className="settings-form" onSubmit={(e) => void save(e)}>
+        {!settings.has_api_key && !settings.fake_llm && (
+          <div className="onboarding">
+            <p>
+              GraftChat runs on your own <a href="https://openrouter.ai" target="_blank" rel="noreferrer">OpenRouter</a>{" "}
+              account. Free models cost nothing: without credits OpenRouter allows 50 requests a day
+              to them (one per message, one or two more per take-away).
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={connecting}
+              onClick={() => void connect()}
+            >
+              {connecting ? "Opening OpenRouter…" : "Connect OpenRouter"}
+            </button>
+            <p className="field-note">
+              Log in on OpenRouter and approve: you come back here with a key, saved on this computer.
+              Or paste a key from{" "}
+              <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>{" "}
+              below.
+            </p>
+          </div>
+        )}
         <div className="field">
           <label htmlFor={keyId}>OpenRouter API key</label>
           {settings.api_key_from_env ? (
@@ -155,6 +218,7 @@ export function SettingsModal({ settings, onSaved, onClose, onError }: Props) {
               )}
             </>
           )}
+          <KeyStatus info={settings.key_info} />
           <p className="field-note">
             The key is stored only on this computer and sent only to OpenRouter.
           </p>

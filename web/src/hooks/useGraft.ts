@@ -44,7 +44,7 @@ const REFUSED_BEFORE_STORING = new Set([
 ]);
 
 export function useGraft() {
-  const { toasts, pushError, dismissToast } = useToasts();
+  const { toasts, pushError, pushInfo, dismissToast } = useToasts();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -140,6 +140,14 @@ export function useGraft() {
   // First load: health, settings, conversation list, then the last opened conversation.
   useEffect(() => {
     let cancelled = false;
+    // Back from "Connect OpenRouter" (api/app.py, oauth_callback): say how it went, once.
+    const params = new URLSearchParams(window.location.search);
+    const oauth = params.get("openrouter");
+    if (oauth) {
+      window.history.replaceState(null, "", window.location.pathname);
+      if (oauth === "connected") pushInfo("Connected to OpenRouter. Your key is saved on this computer.");
+      else pushError(new Error(params.get("message") ?? "Connecting to OpenRouter failed."));
+    }
     void (async () => {
       const [h, s, list] = await Promise.allSettled([
         api.health(),
@@ -150,7 +158,7 @@ export function useGraft() {
       if (h.status === "fulfilled") setHealth(h.value);
       if (s.status === "fulfilled") {
         setSettings(s.value);
-        if (!s.value.has_api_key && !s.value.fake_llm) setSettingsOpen(true);
+        if ((!s.value.has_api_key && !s.value.fake_llm) || oauth === "error") setSettingsOpen(true);
       } else {
         pushError(s.reason);
       }
@@ -167,7 +175,7 @@ export function useGraft() {
     return () => {
       cancelled = true;
     };
-  }, [openConversation, pushError]);
+  }, [openConversation, pushError, pushInfo]);
 
   const setThreadPending = useCallback((key: string, value: PendingRequest | null) => {
     setPending((map) => {

@@ -37,6 +37,7 @@ const SETTINGS: Settings = {
   has_api_key: true,
   api_key_hint: "…a1b2",
   api_key_from_env: false,
+  key_info: null,
   spend_cap_usd: 5,
   chat_model: "x/y:free",
   takeaway_model: null,
@@ -108,10 +109,19 @@ describe("App", () => {
     render(<App />);
     const dialog = await screen.findByRole("dialog", { name: "Settings" });
     expect(within(dialog).getByText(/stored only on this computer and sent only to OpenRouter/)).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Connect OpenRouter" })).toBeTruthy();
     expect(await within(dialog).findByText(/model list could not be loaded/)).toBeTruthy();
     expect(screen.getByText("Free models only")).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("says so when it comes back connected from OpenRouter, and cleans the address", async () => {
+    window.history.replaceState(null, "", "/?openrouter=connected");
+    serve({});
+    render(<App />);
+    expect(await screen.findByText(/Connected to OpenRouter/)).toBeTruthy();
+    expect(window.location.search).toBe("");
   });
 
   it("opens a branch from a selection with code point offsets", async () => {

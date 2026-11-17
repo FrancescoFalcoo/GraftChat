@@ -86,6 +86,8 @@ export const api = {
   getSettings: () => request<Settings>("GET", "/api/settings"),
   putSettings: (update: SettingsUpdate) => request<Settings>("PUT", "/api/settings", update),
   deleteApiKey: () => request<Settings>("DELETE", "/api/settings/api-key"),
+  oauthStart: async (): Promise<string> =>
+    (await request<{ url: string }>("POST", "/api/oauth/start")).url,
   models: async (): Promise<Model[]> =>
     (await request<{ models: Model[] }>("GET", "/api/models")).models,
 

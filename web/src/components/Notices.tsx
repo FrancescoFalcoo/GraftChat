@@ -59,7 +59,7 @@ export function Toasts({ toasts, onDismiss, onOpenSettings }: ToastsProps) {
   return (
     <div className="toasts" aria-live="assertive" aria-atomic="false">
       {toasts.map((t) => (
-        <div key={t.id} className="toast" role="alert">
+        <div key={t.id} className={`toast toast-${t.kind}`} role={t.kind === "error" ? "alert" : "status"}>
           <p>{t.message}</p>
           <div className="toast-actions">
             {t.offerSettings && (
@@ -77,7 +77,7 @@ export function Toasts({ toasts, onDismiss, onOpenSettings }: ToastsProps) {
             <button
               type="button"
               className="icon-btn"
-              aria-label="Dismiss error"
+              aria-label={t.kind === "error" ? "Dismiss error" : "Dismiss"}
               onClick={() => onDismiss(t.id)}
             >
               ×
