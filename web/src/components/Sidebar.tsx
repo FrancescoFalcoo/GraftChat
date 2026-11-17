@@ -1,6 +1,7 @@
-import type { ConversationSummary, Settings } from "../types";
+import type { ConversationState, ConversationSummary, Settings } from "../types";
 import { formatUsd } from "../util";
 import { GraftMark } from "./Marks";
+import { MiniMap } from "./MiniMap";
 
 interface Props {
   conversations: ConversationSummary[];
@@ -9,8 +10,11 @@ interface Props {
   onNewChat: () => void;
   onSelect: (id: number) => void;
   onOpenSettings: () => void;
-  /** Opens the conversation map; null when there is no conversation to map. */
-  onOpenMap: (() => void) | null;
+  /** The conversation on screen, drawn in the map preview. */
+  state: ConversationState | null;
+  panelBranchId: number | null;
+  mapOpen: boolean;
+  onToggleMap: () => void;
 }
 
 function spendLine(settings: Settings | null): string {
@@ -26,7 +30,10 @@ export function Sidebar({
   onNewChat,
   onSelect,
   onOpenSettings,
-  onOpenMap,
+  state,
+  panelBranchId,
+  mapOpen,
+  onToggleMap,
 }: Props) {
   return (
     <nav className="sidebar" aria-label="Conversations">
@@ -70,15 +77,9 @@ export function Sidebar({
         ))}
       </ul>
 
+      <MiniMap state={state} panelBranchId={panelBranchId} open={mapOpen} onToggle={onToggleMap} />
+
       <div className="sidebar-bottom">
-        <button
-          type="button"
-          className="btn btn-block"
-          onClick={onOpenMap ?? undefined}
-          disabled={onOpenMap === null}
-        >
-          Conversation map
-        </button>
         <button type="button" className="btn btn-block" onClick={onOpenSettings}>
           Settings
         </button>

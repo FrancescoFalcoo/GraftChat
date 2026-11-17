@@ -177,3 +177,81 @@ describe("pickAnchorAt", () => {
     expect(pickAnchorAt(candidates, 250, 10)).toBe(1);
   });
 });
+
+describe("buildLogbook", () => {
+  it("lists the first prompt, merges in order with kept and unticked points, open and discarded branches", async () => {
+    const { buildLogbook } = await import("../logbook");
+    const s = state();
+    const pt = (id: number, branchId: number, position: number, included: boolean) => ({
+      id,
+      branch_id: branchId,
+      position,
+      title: `t${id}`,
+      text_generated: `g${id}`,
+      text_final: `f${id}`,
+      included,
+      origin: "model" as const,
+    });
+    s.branches[0].points = [pt(2, 10, 1, false), pt(1, 10, 0, true)];
+    const log = buildLogbook(s);
+    expect(log.start).toEqual({ messageId: 1, text: "ciao" });
+    expect(log.prompts).toBe(4);
+    expect(log.merges.map((m) => [m.number, m.branches.map((b) => b.id)])).toEqual([[1, [10, 20]]]);
+    expect(log.merges[0].branches[0].kept.map((p) => p.id)).toEqual([1]);
+    expect(log.merges[0].branches[0].left.map((p) => p.id)).toEqual([2]);
+    expect(log.open.map((b) => b.id)).toEqual([30]);
+    expect(log.discarded.map((b) => b.id)).toEqual([40]);
+  });
+});
+
+describe("ConversationMap full screen", () => {
+  it("closes with Escape and with its button, and shows the logbook", () => {
+    const onClose = vi.fn();
+    render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={onClose} />);
+    const dialog = screen.getByRole("dialog", { name: "Conversation map" });
+    expect(screen.getByRole("complementary", { name: "Logbook" })).toBeTruthy();
+    expect(screen.getByText("Merge 1")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Close map" }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("zooms with its buttons and marks where you are", () => {
+    render(<ConversationMap state={state()} panelBranchId={30} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
+    const value = () => screen.getByText(/^\d+%$/).textContent;
+    const before = value();
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(value()).not.toBe(before);
+    const current = document.querySelector(".map-node[data-current]");
+    expect(current?.getAttribute("aria-label")).toBe("Go to: bav"); // last prompt of the open branch
+  });
+
+  it("hides and shows the logbook", () => {
+    render(<ConversationMap state={state()} onJump={() => {}} onOpenBranch={() => {}} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Hide logbook" }));
+    expect(screen.queryByRole("complementary", { name: "Logbook" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Logbook" }));
+    expect(screen.getByRole("complementary", { name: "Logbook" })).toBeTruthy();
+  });
+});
+
+describe("MiniMap", () => {
+  it("is a picture of the map that opens it, and does not repeat the chat's text", async () => {
+    const { MiniMap } = await import("../components/MiniMap");
+    const onToggle = vi.fn();
+    render(<MiniMap state={state()} panelBranchId={null} open={false} onToggle={onToggle} />);
+    expect(screen.queryByText("guru")).toBeNull(); // drawn through CSS attr(), not page text
+    expect(document.querySelector('[data-text="guru"]')).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open the conversation map full screen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open map" }));
+    expect(onToggle).toHaveBeenCalledTimes(2);
+  });
+
+  it("says what will appear in an empty conversation", async () => {
+    const { MiniMap } = await import("../components/MiniMap");
+    render(<MiniMap state={{ ...state(), main: [], branches: [] }} panelBranchId={null} open={false} onToggle={() => {}} />);
+    expect(screen.getByText(/appears here once you ask something/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open map" })).toHaveProperty("disabled", true);
+  });
+});

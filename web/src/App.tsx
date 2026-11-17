@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { playGlop } from "./sound";
 import { BranchPanel } from "./components/BranchPanel";
 import { ConversationMap } from "./components/ConversationMap";
@@ -17,6 +17,20 @@ export function App() {
   const panelBranch = state?.branches.find((b) => b.id === g.panelBranchId) ?? null;
   const pendingCount = state ? pendingBranches(state).length : 0;
   const [mapOpen, setMapOpen] = useState(false);
+  const canMap = state !== null && state.main.length > 0;
+
+  // The full-screen map is modal: what is behind it cannot be reached with Tab.
+  useEffect(() => {
+    const behind = document.querySelector(".layout");
+    if (!behind) return;
+    if (mapOpen) behind.setAttribute("inert", "");
+    else behind.removeAttribute("inert");
+  }, [mapOpen]);
+
+  // A conversation with nothing to map closes it (new chat, empty conversation).
+  useEffect(() => {
+    if (!canMap) setMapOpen(false);
+  }, [canMap]);
 
   /** From the map: show the prompt, opening its branch in the side panel if needed. */
   const jumpTo = (messageId: number, branchId: number | null): void => {
@@ -49,7 +63,10 @@ export function App() {
           onNewChat={() => void g.newChat()}
           onSelect={(id) => void g.openConversation(id)}
           onOpenSettings={g.openSettings}
-          onOpenMap={state && state.main.length > 0 ? () => setMapOpen(true) : null}
+          state={state}
+          panelBranchId={panelBranch?.id ?? null}
+          mapOpen={mapOpen}
+          onToggleMap={() => setMapOpen((open) => !open && canMap)}
         />
         <MainChat
           state={state}
@@ -105,6 +122,7 @@ export function App() {
       {mapOpen && state && (
         <ConversationMap
           state={state}
+          panelBranchId={panelBranch?.id ?? null}
           onJump={jumpTo}
           onOpenBranch={(id) => {
             setMapOpen(false);
