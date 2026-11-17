@@ -103,6 +103,24 @@ interface ConversationState {
   main: Message[];            // the main thread, in order, merge nodes included
   branches: Branch[];         // ordered by creation
   pending_branch_ids: number[] | null; // null while core.tree.pending_branches is not implemented
+  usage: Usage;               // tokens and cost of this conversation's model calls
+}
+
+// From llm_call_log. "input" is the whole context sent with a call, so it grows with the chat.
+interface UsageTotals { calls: number; input_tokens: number; output_tokens: number; cost: number }
+
+interface Usage {
+  total: UsageTotals;         // every call of the conversation
+  chat: UsageTotals;          // the calls that produced an answer
+  takeaway: UsageTotals;      // the take-away generations
+  threads: (UsageTotals & { branch_id: number | null })[];  // null = main; a take-away counts for its branch
+  messages: {                 // per answer: the call that produced it (table call_message, migration 0006;
+    message_id: number;       //   answers stored before it have no entry)
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    cost: number;             // USD as reported by OpenRouter; 0 for free models
+  }[];
 }
 
 interface Settings {

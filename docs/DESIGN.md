@@ -15,6 +15,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-17 | A branch starts from main as it was when it was opened: it sees the take-aways merged before that moment, even after its anchor (§7, §14.11; `branch.base_message_id` in §6). Images on user messages added to the v1 scope (§4, §6, §14.12). |
 | 2026-11-17 | Documents on user messages (PDF, Word, plain text and code), read to text locally (§4, §6, §14.13). |
 | 2026-11-17 | Take-away points written by hand in the merge checklist (§5, §6, §14.14). |
+| 2026-11-17 | Usage figures: tokens and cost under each answer, per branch and per conversation, from the call log; off by default, switched on in Settings (§4). |
 | 2026-11-17 | Conversation map redrawn as a tree of blocks with pan and zoom, always visible as a preview in the sidebar, full screen with a logbook (§4). A new branch takes the keyboard focus. |
 
 ## 1. Problem
@@ -59,6 +60,7 @@ In:
   - Ways out: "Back to chat" top left, × top right, "Close map" bottom left, Escape (which first closes the details, if open).
 - In the chat, a merge node lists each merged branch folded: its passage and "N points brought back"; a click shows the points (each expandable to its text) and "Open this branch".
 - Opening a branch puts the keyboard in its message box: one types right away.
+- Usage figures (Settings, "Show tokens and cost", off by default): under each answer the tokens of the context that was sent and of the answer, and their cost; in each branch its totals; in the chat header the conversation's totals, opening to a breakdown by answers and take-aways and by thread. They come from `llm_call_log` (DESIGN §4: every call is logged); an API-side table `call_message` links each answer to the call that produced it, outside `core`.
 - Interface: green-ink theme (light and dark, following the system), serif for the model's answers; the user's messages on the right; the main column widens and centres when no branch is open. Each branch has its own lane colour, used everywhere the branch appears. A new branch puts its composer right under the hint; confirmations use the app's own dialog. Opening a branch and merging play a short synthesised sound and a brief animation (the sound can be switched off in Settings).
 - Logging of every LLM call (for the experiment).
 
