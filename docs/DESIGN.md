@@ -10,7 +10,7 @@ Anchored branching chat for LLMs: graft side conversations onto any passage of a
 | 2026-11-13 | Added §14 Decisions (thread roots, empty threads, where merge blocks and anchor notes go, empty merges); §6 and §7 aligned. |
 | 2026-11-15 | Added §14.5 branch state machine and §14.6 `merge_branch` checks; restore, archive and multiple merges added to the v2 backlog (§10). |
 | 2026-11-16 | Added §14.7–§14.10 (what `check_invariants` and `pending_branches` cover, context building details). `api/` and `web/` implemented against [API.md](API.md). |
-| 2026-11-17 | Editorial pass: neutral tone; §9 restated as module responsibilities; §4, §8 and §12 aligned with the implementation. |
+| 2026-11-17 | Editorial pass: neutral tone; §9 Ownership written as prose; §4, §8 and §12 aligned with the implementation. |
 
 ## 1. Problem
 
@@ -141,14 +141,15 @@ Sibling branches are not visible to each other (isolation).
 - Lightweight free model (e.g. Gemma 4 26B A4B via OpenRouter), JSON output `[{ "title": "...", "text": "..." }]`, titles ≤ 5 words, 1–6 points. The format is requested in the prompt; the answer is parsed tolerantly (code fences, surrounding prose) and requested once more if it cannot be read.
 - Default: all points checked (fast path for a user who wants to move on). The risk is that unread points enter the context; this is accepted and documented as a limitation.
 
-## 9. Module responsibilities
+## 9. Ownership
 
-| Module | Responsibility |
-|---|---|
-| `core/` | Data model, tree operations and invariants (§14), context builder (§7), merge logic and point inclusion. Pure Python, no I/O: the part the experiment depends on. |
-| `api/` | HTTP API ([API.md](API.md)), SQLite persistence and migrations, provider client with retries, take-away generation, spend cap, call logging. It decides no tree rule: every rule comes from `core/`. |
-| `web/` | User interface: chat, anchor selection, branch side panel, merge checklist, return-to-main banner. |
-| `experiments/` | Experiment runner and evaluation (§11). |
+The work is split into two areas.
+
+**The author's area.** The author owns the core of the project: the tree data model and its invariants, the context builder (§7), the merge logic and the inclusion of take-away points, and the experiment runner and its evaluation (§11). These are the parts the research question depends on. The author designs them, is responsible for them and can explain every line of them. They live in `core/` and `experiments/`.
+
+**Delegated to Claude Code.** Everything else was delegated to Claude Code, and to Claude Code alone: the user interface (its components, the branch side panel and the merge checklist), the provider API client and its retries, the SQLite wiring and migrations, and the README with its demo GIF. These parts serve the core and take no decision about it. They live in `web/` and `api/`.
+
+Claude Code may also review the core code.
 
 ## 10. v2 backlog
 
