@@ -174,8 +174,9 @@ python devtools/preview.py        # what every core function returns on a sample
 
 ## Status
 
-v1 is feature-complete: chat, branches, merge with take-aways, bring-your-own-key, spend cap
-and call logging all work end to end. Next comes the experiment.
+v1.0 is released: chat, branches, merge with take-aways, points of your own, attachments, the
+conversation map and logbook, bring-your-own-key, spend cap, usage figures and call logging all
+work end to end. Next comes the experiment.
 
 Out of scope for v1, by design: branches of branches, streaming, several providers, editing
 past messages, scanned PDFs (no OCR). The backlog is in [DESIGN.md §10](docs/DESIGN.md#10-v2-backlog).

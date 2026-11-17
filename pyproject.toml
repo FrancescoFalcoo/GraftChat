@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "graftchat"
-version = "0.1.0"
+version = "1.0.0"
 description = "Anchored branching chat for LLMs: graft side conversations onto any passage of an answer, then bring back only what matters."
 readme = "README.md"
 requires-python = ">=3.11"
