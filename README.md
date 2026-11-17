@@ -37,6 +37,11 @@ Ok, what do I do first with the images?
 
 A branch that is never merged contributes nothing.
 
+The **conversation map** draws the whole chat as a tree: main as a trunk, each branch in its
+own colour, merges as knots. It is always visible in small at the bottom of the sidebar and
+opens full screen with zoom, the details of every prompt and a **logbook** of what each merge
+brought back. Take-aways can be completed by hand too: add your own points before merging.
+
 You can also attach files to a message (paste, drop or the clip button). Images reach models
 that accept them, marked "images" in Settings. PDFs, Word files and text or code files are read
 to text on your computer and work with every model.
@@ -99,8 +104,13 @@ set there or in `OPENROUTER_API_KEY` wins over the one saved from the UI.
 ## Privacy and cost
 
 - **Your key stays on your computer.** It is saved in `~/.graftchat/settings.json`, outside
-  this repository, and is sent only to OpenRouter. The server listens on `127.0.0.1` only and refuses requests
-  coming from other websites open in the same browser.
+  this repository, and is sent only to OpenRouter. The server listens on `127.0.0.1` only and
+  refuses requests coming from other websites open in the same browser.
+- **What you write leaves your computer only towards the model.** Messages, take-aways and
+  attached files go to OpenRouter and from there to the provider of the model you chose.
+  Their policies vary: some providers, free models especially, may keep prompts or use them
+  for training. Check the privacy settings of your OpenRouter account before sending anything
+  sensitive. Nothing goes anywhere else: no analytics, no external fonts or scripts.
 - **Spend cap.** Before every model call the app adds up what the month has cost so far and
   refuses the call once the cap is reached. A cap of 0 means free models only.
 - **Everything is logged locally.** Each model call is stored in a local SQLite database
