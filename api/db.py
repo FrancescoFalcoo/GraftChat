@@ -121,6 +121,7 @@ def _branch(row: sqlite3.Row) -> Branch:
         status=BranchStatus(row["status"]),
         merge_message_id=row["merge_message_id"],
         created_at=_dt(row["created_at"]),
+        base_message_id=row["base_message_id"],
     )
 
 
@@ -287,8 +288,9 @@ def insert_branch(conn: sqlite3.Connection, branch: Branch) -> None:
     conn.execute(
         """
         INSERT INTO branch (id, conversation_id, anchor_message_id, anchor_start, anchor_end,
-                            anchor_quote, status, merge_message_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            anchor_quote, status, merge_message_id, created_at,
+                            base_message_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             branch.id,
@@ -300,6 +302,7 @@ def insert_branch(conn: sqlite3.Connection, branch: Branch) -> None:
             branch.status.value,
             branch.merge_message_id,
             branch.created_at.isoformat(),
+            branch.base_message_id,
         ),
     )
 

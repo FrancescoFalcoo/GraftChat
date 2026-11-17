@@ -109,6 +109,7 @@ def _branch_json(branch: Branch, messages: Sequence[Message], points: Sequence[T
         "anchor_quote": branch.anchor_quote,
         "status": branch.status.value,
         "merge_message_id": branch.merge_message_id,
+        "base_message_id": branch.base_message_id,
         "created_at": branch.created_at.isoformat(),
         "messages": [_message_json(m) for m in tree.thread(messages, branch.id)],
         "points": [_point_json(p) for p in own_points],
@@ -443,9 +444,17 @@ class Service:
                         "The selected text does not match the message at these offsets "
                         "(offsets must be Python string offsets, in code points)."
                     )
+                # The branch starts from main as it is now: take-aways merged so far are
+                # visible in it, even when the merge came after the anchor (DESIGN.md §14.11).
+                main = tree.thread(db.load_messages(conn, conversation_id))
                 # Out-of-range offsets and every rule about the anchor are core's to refuse.
                 branch = tree.open_branch(
-                    anchor, start, end, new_id=db.next_branch_id(conn), created_at=self._now()
+                    anchor,
+                    start,
+                    end,
+                    new_id=db.next_branch_id(conn),
+                    created_at=self._now(),
+                    base_message_id=main[-1].id if main else None,
                 )
                 db.insert_branch(conn, branch)
                 self._check(conn, conversation_id)
@@ -550,9 +559,10 @@ class Service:
                 main = tree.thread(messages)
                 if main and main[-1].role == Role.USER:
                     raise conflict("Main is waiting for a reply: retry or delete its last message first.")
-                if main and main[-1].role == Role.MERGE:
-                    node = main[-1]  # several branches may share the merge node at the end of main
-                else:
+                # Branches merged together share the merge node at the end of main, unless
+                # a branch was opened from that node since: core decides (DESIGN.md §14.11).
+                node = tree.reusable_merge_node(messages, db.load_branches(conn, conversation_id))
+                if node is None:
                     node = db.insert_message(
                         conn,
                         conversation_id=conversation_id,
